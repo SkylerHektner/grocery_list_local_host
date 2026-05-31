@@ -1,4 +1,4 @@
-use axum::{Json, Router, routing::get};
+use axum::{Json, Router, http::StatusCode, routing::get};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::Path;
@@ -79,7 +79,7 @@ async fn get_items() -> Json<Vec<Item>> {
     Json(items)
 }
 
-async fn add_item(Json(payload): Json<Item>) -> String {
+async fn add_item(Json(payload): Json<Item>) -> (StatusCode, String) {
     let file_path = "data/items.ron";
 
     // 1. Read the existing items from the file (if it exists)
@@ -94,18 +94,32 @@ async fn add_item(Json(payload): Json<Item>) -> String {
         Vec::new()
     };
 
-    // 2. Add the new item
+    // 2. Check for duplicate
+    if items
+        .iter()
+        .any(|item| item.name.eq_ignore_ascii_case(&payload.name))
+    {
+        return (
+            StatusCode::CONFLICT,
+            format!("Item '{}' already exists.", payload.name),
+        );
+    }
+
+    // 3. Add the new item
     items.push(payload.clone());
 
-    // 3. Serialize back to RON format with nice indentation
+    // 4. Serialize back to RON format with nice indentation
     let pretty_config = ron::ser::PrettyConfig::default();
     let ron_string =
         ron::ser::to_string_pretty(&items, pretty_config).expect("Failed to serialize to RON");
 
-    // 4. Save the file
+    // 5. Save the file
     fs::write(file_path, ron_string)
         .await
         .expect("Failed to write to file");
 
-    format!("Successfully added {}!", payload.name)
+    (
+        StatusCode::OK,
+        format!("Successfully added {}!", payload.name),
+    )
 }

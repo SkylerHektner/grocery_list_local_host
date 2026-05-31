@@ -6,6 +6,8 @@ const itemInput = document.getElementById("item-input");
 const itemCategory = document.getElementById("item-category");
 const itemsList = document.getElementById("items-list");
 
+let currentItems = [];
+
 // Fetch and populate categories
 async function fetchAndPopulateCategories() {
   try {
@@ -32,6 +34,7 @@ async function fetchAndDisplayItems() {
     const response = await fetch("/api/items");
     if (response.ok) {
       const items = await response.json();
+      currentItems = items; // Store for duplicate checking
       itemsList.innerHTML = ""; // Clear current list
 
       if (items.length === 0) {
@@ -91,6 +94,16 @@ submitBtn.addEventListener("click", async () => {
     return;
   }
 
+  // Check for duplicates
+  const isDuplicate = currentItems.some(
+    (item) => item.name.toLowerCase() === name.toLowerCase(),
+  );
+
+  if (isDuplicate) {
+    alert(`The item "${name}" already exists!`);
+    return;
+  }
+
   try {
     const response = await fetch("/api/items", {
       method: "POST",
@@ -105,6 +118,9 @@ submitBtn.addEventListener("click", async () => {
       itemCategory.value = ""; // Clear category
       modalBackdrop.classList.add("hidden");
       await fetchAndDisplayItems(); // Refresh the list
+    } else if (response.status === 409) {
+      const msg = await response.text();
+      alert(msg);
     } else {
       alert("Failed to add item.");
     }
