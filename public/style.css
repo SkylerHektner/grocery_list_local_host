@@ -111,6 +111,18 @@ button:hover {
     color: #888;
     font-style: italic;
 }
+#items-list li.category-header {
+    background-color: transparent;
+    border: none;
+    padding: 0 0.25rem;
+    margin-bottom: 0.25rem;
+    color: #6c757d;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    box-shadow: none;
+}
 .category-tag {
     font-size: 0.75rem;
     background-color: #007bff;

@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs;
 
+// Categories
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum Category {
     Dairy,
@@ -29,6 +31,12 @@ impl Category {
         ]
     }
 }
+
+pub async fn get_categories() -> Json<Vec<Category>> {
+    Json(Category::all())
+}
+
+// Items
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Item {

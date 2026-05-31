@@ -2,11 +2,11 @@ mod grocery_list;
 mod items;
 
 use axum::{
-    Json, Router,
+    Router,
     routing::{get, patch},
 };
 use grocery_list::{add_to_grocery_list, delete_grocery_list, get_grocery_list};
-use items::{Category, add_item, delete_item, get_items, update_item};
+use items::{add_item, delete_item, get_categories, get_items, update_item};
 use std::net::SocketAddr;
 use std::path::Path;
 use tokio::fs;
@@ -37,8 +37,4 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-async fn get_categories() -> Json<Vec<Category>> {
-    Json(Category::all())
 }

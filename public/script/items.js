@@ -8,17 +8,23 @@ const newItemCategory = document.getElementById("item-category");
 const itemsList = document.getElementById("items-list");
 
 // edit item
-const editItemModalBackdrop = document.getElementById("edit-item-modal-backdrop");
+const editItemModalBackdrop = document.getElementById(
+  "edit-item-modal-backdrop",
+);
 const editItemCancelBtn = document.getElementById("edit-item-cancel-btn");
 const editItemSubmitBtn = document.getElementById("edit-item-submit-btn");
 const editItemInput = document.getElementById("edit-item-input");
 const editItemCategory = document.getElementById("edit-item-category");
 
 // delete item
-const deleteItemModalBackdrop = document.getElementById("delete-item-modal-backdrop");
+const deleteItemModalBackdrop = document.getElementById(
+  "delete-item-modal-backdrop",
+);
 const deleteItemCancelBtn = document.getElementById("delete-item-cancel-btn");
 const deleteItemSubmitBtn = document.getElementById("delete-item-submit-btn");
-const deleteItemNameDisplay = document.getElementById("delete-item-name-display");
+const deleteItemNameDisplay = document.getElementById(
+  "delete-item-name-display",
+);
 
 export let currentItems = [];
 let editItemTargetName = "";
@@ -64,7 +70,27 @@ export async function fetchAndDisplayItems() {
         return;
       }
 
+      // Sort items by category, then by name
+      items.sort((a, b) => {
+        if (a.category === b.category) {
+          return a.name.localeCompare(b.name);
+        }
+        return a.category.localeCompare(b.category);
+      });
+
+      let currentCategory = null;
+
       items.forEach((item) => {
+        if (item.category !== currentCategory) {
+          const categoryHeader = document.createElement("li");
+          categoryHeader.className = "category-header";
+          categoryHeader.textContent = item.category;
+          categoryHeader.style.marginTop =
+            currentCategory === null ? "0" : "1rem";
+          itemsList.appendChild(categoryHeader);
+          currentCategory = item.category;
+        }
+
         const li = document.createElement("li");
         li.style.display = "flex";
         li.style.justifyContent = "space-between";
@@ -79,16 +105,11 @@ export async function fetchAndDisplayItems() {
         const nameSpan = document.createElement("span");
         nameSpan.textContent = item.name;
 
-        const categorySpan = document.createElement("span");
-        categorySpan.className = "category-tag";
-        categorySpan.textContent = item.category;
-
         const infoDiv = document.createElement("div");
         infoDiv.style.display = "flex";
         infoDiv.style.alignItems = "center";
         infoDiv.style.gap = "0.5rem";
         infoDiv.appendChild(nameSpan);
-        infoDiv.appendChild(categorySpan);
 
         const actionsDiv = document.createElement("div");
         actionsDiv.className = "item-actions";
