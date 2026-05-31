@@ -5,8 +5,8 @@ use std::path::Path;
 use tokio::fs;
 use tower_http::services::ServeDir;
 
-#[derive(Deserialize, Serialize)]
-struct NewName {
+#[derive(Deserialize, Serialize, Clone)]
+struct Item {
     name: String,
 }
 
@@ -19,7 +19,7 @@ async fn main() {
 
     // Set up our router. We have an API endpoint and the static fallback.
     let app = Router::new()
-        .route("/api/names", get(get_names).post(add_name))
+        .route("/api/items", get(get_items).post(add_item))
         .fallback_service(ServeDir::new("public"));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -29,10 +29,10 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn get_names() -> Json<Vec<String>> {
-    let file_path = "data/names.ron";
+async fn get_items() -> Json<Vec<Item>> {
+    let file_path = "data/items.ron";
 
-    let names: Vec<String> = if Path::new(file_path).exists() {
+    let items: Vec<Item> = if Path::new(file_path).exists() {
         let content = fs::read_to_string(file_path).await.unwrap_or_default();
         if content.is_empty() {
             Vec::new()
@@ -43,14 +43,14 @@ async fn get_names() -> Json<Vec<String>> {
         Vec::new()
     };
 
-    Json(names)
+    Json(items)
 }
 
-async fn add_name(Json(payload): Json<NewName>) -> String {
-    let file_path = "data/names.ron";
+async fn add_item(Json(payload): Json<Item>) -> String {
+    let file_path = "data/items.ron";
 
-    // 1. Read the existing names from the file (if it exists)
-    let mut names: Vec<String> = if Path::new(file_path).exists() {
+    // 1. Read the existing items from the file (if it exists)
+    let mut items: Vec<Item> = if Path::new(file_path).exists() {
         let content = fs::read_to_string(file_path).await.unwrap_or_default();
         if content.is_empty() {
             Vec::new()
@@ -61,13 +61,13 @@ async fn add_name(Json(payload): Json<NewName>) -> String {
         Vec::new()
     };
 
-    // 2. Add the new name
-    names.push(payload.name.clone());
+    // 2. Add the new item
+    items.push(payload.clone());
 
     // 3. Serialize back to RON format with nice indentation
     let pretty_config = ron::ser::PrettyConfig::default();
     let ron_string =
-        ron::ser::to_string_pretty(&names, pretty_config).expect("Failed to serialize to RON");
+        ron::ser::to_string_pretty(&items, pretty_config).expect("Failed to serialize to RON");
 
     // 4. Save the file
     fs::write(file_path, ron_string)
