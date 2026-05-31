@@ -1,9 +1,11 @@
+mod grocery_list;
 mod items;
 
 use axum::{
     Json, Router,
     routing::{get, patch},
 };
+use grocery_list::{add_to_grocery_list, delete_grocery_list, get_grocery_list};
 use items::{Category, add_item, delete_item, get_items, update_item};
 use std::net::SocketAddr;
 use std::path::Path;
@@ -22,6 +24,12 @@ async fn main() {
         .route("/api/items", get(get_items).post(add_item))
         .route("/api/items/{name}", patch(update_item).delete(delete_item))
         .route("/api/categories", get(get_categories))
+        .route(
+            "/api/grocery_list",
+            get(get_grocery_list)
+                .post(add_to_grocery_list)
+                .delete(delete_grocery_list),
+        )
         .fallback_service(ServeDir::new("public"));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

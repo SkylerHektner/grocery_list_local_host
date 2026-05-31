@@ -15,6 +15,20 @@ body {
     padding: 3rem;
     border-radius: 12px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-width: 900px;
+    width: 90%;
+}
+.main-content {
+    display: flex;
+    gap: 2rem;
+    margin-top: 2rem;
+    text-align: left;
+}
+.items-column,
+.grocery-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 h1 {
     color: #333;
@@ -38,26 +52,50 @@ button:hover {
 }
 
 /* Items List Styles */
-.items-container {
-    margin-top: 2rem;
-    text-align: left;
+.items-container,
+.grocery-container {
     border-top: 1px solid #eee;
     padding-top: 1rem;
+    margin-top: 1rem;
+    flex-grow: 1;
+    min-height: 250px;
 }
-.items-container h2 {
+.grocery-container {
+    background-color: #f8f9fa;
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 1rem;
+    position: relative;
+    transition:
+        background-color 0.2s,
+        border-color 0.2s;
+}
+.grocery-container.drag-over {
+    background-color: #e2e6ea;
+    border-color: #007bff;
+}
+.drop-hint {
+    text-align: center;
+    color: #888;
+    font-style: italic;
+    margin-bottom: 1rem;
+}
+.items-column h2,
+.grocery-column h2 {
     font-size: 1.25rem;
     color: #333;
-    margin-bottom: 1rem;
-    text-align: center;
+    margin-bottom: 0.5rem;
 }
-#items-list {
+#items-list,
+#grocery-list {
     list-style-type: none;
     padding: 0;
     margin: 0;
-    max-height: 200px;
+    max-height: 300px;
     overflow-y: auto;
 }
-#items-list li {
+#items-list li,
+#grocery-list li {
     background: #f8f9fa;
     margin-bottom: 0.5rem;
     padding: 0.75rem 1rem;
@@ -65,7 +103,8 @@ button:hover {
     border: 1px solid #e9ecef;
     color: #444;
 }
-#items-list li.empty-message {
+#items-list li.empty-message,
+#grocery-list li.empty-message {
     text-align: center;
     background: none;
     border: none;

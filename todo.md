@@ -1,3 +1,5 @@
-1. Need to add a concept of a "Current List" or "Shopping List"
-2. Need to add a concept of "Recipes"
-3. Need to refine UX
+- Need to enforce some rules when adding items. First character of every word always caps.
+- Need to change how items are displayed. Should be grouped under categories
+- Need a way to remove items from your grocery list
+- Don't like how grocery_list.rs uses a raw string payload. Want a more structured schema like Item.rs
+- Need to add a concept of "Recipes"
