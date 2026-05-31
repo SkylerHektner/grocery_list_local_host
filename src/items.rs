@@ -36,6 +36,29 @@ pub struct Item {
     pub category: Category,
 }
 
+fn format_item_name(name: &str) -> String {
+    let mut cleaned = String::new();
+    for c in name.chars() {
+        if c == '_' || c == '-' || c == '.' {
+            cleaned.push(' ');
+        } else if c.is_alphanumeric() || c == ' ' {
+            cleaned.push(c);
+        }
+    }
+
+    cleaned
+        .split_whitespace()
+        .map(|word| {
+            let mut c = word.chars();
+            match c.next() {
+                None => String::new(),
+                Some(f) => f.to_uppercase().collect::<String>() + &c.as_str().to_lowercase(),
+            }
+        })
+        .collect::<Vec<String>>()
+        .join(" ")
+}
+
 pub async fn get_items() -> Json<Vec<Item>> {
     let file_path = "data/items.ron";
 
@@ -58,6 +81,7 @@ pub async fn update_item(
     Json(payload): Json<Item>,
 ) -> (StatusCode, String) {
     let file_path = "data/items.ron";
+    let formatted_name = format_item_name(&payload.name);
 
     let mut items: Vec<Item> = if Path::new(file_path).exists() {
         let content = fs::read_to_string(file_path).await.unwrap_or_default();
@@ -74,7 +98,7 @@ pub async fn update_item(
         .iter_mut()
         .find(|i| i.name.eq_ignore_ascii_case(&old_name))
     {
-        item.name = payload.name.clone();
+        item.name = formatted_name.clone();
         item.category = payload.category;
 
         let pretty_config = ron::ser::PrettyConfig::default();
@@ -87,7 +111,7 @@ pub async fn update_item(
 
         (
             StatusCode::OK,
-            format!("Successfully updated {}!", payload.name),
+            format!("Successfully updated {}!", formatted_name),
         )
     } else {
         (
@@ -131,6 +155,7 @@ pub async fn delete_item(AxumPath(name): AxumPath<String>) -> (StatusCode, Strin
 
 pub async fn add_item(Json(payload): Json<Item>) -> (StatusCode, String) {
     let file_path = "data/items.ron";
+    let formatted_name = format_item_name(&payload.name);
 
     // 1. Read the existing items from the file (if it exists)
     let mut items: Vec<Item> = if Path::new(file_path).exists() {
@@ -147,16 +172,18 @@ pub async fn add_item(Json(payload): Json<Item>) -> (StatusCode, String) {
     // 2. Check for duplicate
     if items
         .iter()
-        .any(|item| item.name.eq_ignore_ascii_case(&payload.name))
+        .any(|item| item.name.eq_ignore_ascii_case(&formatted_name))
     {
         return (
             StatusCode::CONFLICT,
-            format!("Item '{}' already exists.", payload.name),
+            format!("Item '{}' already exists.", formatted_name),
         );
     }
 
     // 3. Add the new item
-    items.push(payload.clone());
+    let mut new_item = payload.clone();
+    new_item.name = formatted_name.clone();
+    items.push(new_item);
 
     // 4. Serialize back to RON format with nice indentation
     let pretty_config = ron::ser::PrettyConfig::default();
@@ -170,6 +197,6 @@ pub async fn add_item(Json(payload): Json<Item>) -> (StatusCode, String) {
 
     (
         StatusCode::OK,
-        format!("Successfully added {}!", payload.name),
+        format!("Successfully added {}!", formatted_name),
     )
 }
