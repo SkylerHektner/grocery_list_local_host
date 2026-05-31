@@ -3,7 +3,28 @@ const modalBackdrop = document.getElementById("modal-backdrop");
 const cancelBtn = document.getElementById("cancel-btn");
 const submitBtn = document.getElementById("submit-btn");
 const itemInput = document.getElementById("item-input");
+const itemCategory = document.getElementById("item-category");
 const itemsList = document.getElementById("items-list");
+
+// Fetch and populate categories
+async function fetchAndPopulateCategories() {
+  try {
+    const response = await fetch("/api/categories");
+    if (response.ok) {
+      const categories = await response.json();
+      categories.forEach((category) => {
+        const option = document.createElement("option");
+        option.value = category;
+        option.textContent = category;
+        itemCategory.appendChild(option);
+      });
+    } else {
+      console.error("Failed to fetch categories");
+    }
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+  }
+}
 
 // Fetch and display items from the server
 async function fetchAndDisplayItems() {
@@ -21,7 +42,19 @@ async function fetchAndDisplayItems() {
 
       items.forEach((item) => {
         const li = document.createElement("li");
-        li.textContent = item.name;
+        li.style.display = "flex";
+        li.style.justifyContent = "space-between";
+        li.style.alignItems = "center";
+
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = item.name;
+
+        const categorySpan = document.createElement("span");
+        categorySpan.className = "category-tag";
+        categorySpan.textContent = item.category;
+
+        li.appendChild(nameSpan);
+        li.appendChild(categorySpan);
         itemsList.appendChild(li);
       });
     } else {
@@ -51,7 +84,12 @@ cancelBtn.addEventListener("click", () => {
 // Handle submit
 submitBtn.addEventListener("click", async () => {
   const name = itemInput.value.trim();
-  if (!name) return;
+  const category = itemCategory.value;
+
+  if (!name || !category) {
+    alert("Please enter a name and select a category.");
+    return;
+  }
 
   try {
     const response = await fetch("/api/items", {
@@ -59,11 +97,12 @@ submitBtn.addEventListener("click", async () => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ name: name }),
+      body: JSON.stringify({ name: name, category: category }),
     });
 
     if (response.ok) {
       itemInput.value = ""; // Clear input on success
+      itemCategory.value = ""; // Clear category
       modalBackdrop.classList.add("hidden");
       await fetchAndDisplayItems(); // Refresh the list
     } else {
@@ -75,5 +114,6 @@ submitBtn.addEventListener("click", async () => {
   }
 });
 
-// Load items when the page starts
+// Load data when the page starts
+fetchAndPopulateCategories();
 fetchAndDisplayItems();

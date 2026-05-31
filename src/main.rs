@@ -5,9 +5,37 @@ use std::path::Path;
 use tokio::fs;
 use tower_http::services::ServeDir;
 
+#[derive(Deserialize, Serialize, Clone, Debug)]
+enum Category {
+    Dairy,
+    Meat,
+    Produce,
+    Bakery,
+    Shelf,
+    Artisan,
+    Frozen,
+    Other,
+}
+
+impl Category {
+    fn all() -> Vec<Category> {
+        vec![
+            Category::Dairy,
+            Category::Meat,
+            Category::Produce,
+            Category::Bakery,
+            Category::Shelf,
+            Category::Artisan,
+            Category::Frozen,
+            Category::Other,
+        ]
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone)]
 struct Item {
     name: String,
+    category: Category,
 }
 
 #[tokio::main]
@@ -20,6 +48,7 @@ async fn main() {
     // Set up our router. We have an API endpoint and the static fallback.
     let app = Router::new()
         .route("/api/items", get(get_items).post(add_item))
+        .route("/api/categories", get(get_categories))
         .fallback_service(ServeDir::new("public"));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -27,6 +56,10 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn get_categories() -> Json<Vec<Category>> {
+    Json(Category::all())
 }
 
 async fn get_items() -> Json<Vec<Item>> {

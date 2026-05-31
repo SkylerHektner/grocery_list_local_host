@@ -72,6 +72,14 @@ button:hover {
     color: #888;
     font-style: italic;
 }
+.category-tag {
+    font-size: 0.75rem;
+    background-color: #007bff;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-weight: bold;
+}
 
 /* Modal Styles */
 .modal-backdrop {
@@ -100,13 +108,15 @@ button:hover {
 .modal h2 {
     margin-top: 0;
 }
-.modal input {
+.modal input,
+.modal select {
     width: 90%;
     padding: 0.5rem;
-    margin: 1rem 0;
+    margin: 0.5rem 0 1rem 0;
     border: 1px solid #ccc;
     border-radius: 4px;
     font-size: 1rem;
+    box-sizing: border-box;
 }
 .modal-actions {
     display: flex;
