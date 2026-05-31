@@ -10,7 +10,22 @@
         <div class="container">
             <h1>Hello, World! 🚀</h1>
             <p>Your Axum server is serving static files successfully.</p>
-            <button id="hello-btn">Click Me!</button>
+            <button id="add-name-btn">Add Name</button>
+        </div>
+
+        <!-- Modal Background -->
+        <div id="modal-backdrop" class="modal-backdrop hidden">
+            <!-- Modal Content -->
+            <div class="modal">
+                <h2>Enter your name</h2>
+                <input type="text" id="name-input" placeholder="Your name..." />
+                <div class="modal-actions">
+                    <button id="cancel-btn" class="btn-secondary">
+                        Cancel
+                    </button>
+                    <button id="submit-btn" class="btn-primary">Submit</button>
+                </div>
+            </div>
         </div>
 
         <script src="/script.js"></script>
