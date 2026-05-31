@@ -14,7 +14,7 @@
                 <!-- Left Column: Items Catalog -->
                 <div class="items-column">
                     <h2>Available Items</h2>
-                    <button id="add-item-btn">Add New Item</button>
+                    <button id="new-item-btn">Add New Item</button>
                     <div class="items-container">
                         <ul id="items-list">
                             <li>Loading...</li>
@@ -53,8 +53,8 @@
             </div>
         </div>
 
-        <!-- Modal Background -->
-        <div id="modal-backdrop" class="modal-backdrop hidden">
+        <!-- New Item Modal Background -->
+        <div id="new-item-modal-backdrop" class="modal-backdrop hidden">
             <!-- Modal Content -->
             <div class="modal">
                 <h2>Enter item details</h2>
@@ -65,16 +65,18 @@
                     </option>
                 </select>
                 <div class="modal-actions">
-                    <button id="cancel-btn" class="btn-secondary">
+                    <button id="new-item-cancel-btn" class="btn-secondary">
                         Cancel
                     </button>
-                    <button id="submit-btn" class="btn-primary">Submit</button>
+                    <button id="new-item-submit-btn" class="btn-primary">
+                        Submit
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Edit Modal Background -->
-        <div id="edit-modal-backdrop" class="modal-backdrop hidden">
+        <!-- Edit Item Modal Background -->
+        <div id="edit-item-modal-backdrop" class="modal-backdrop hidden">
             <!-- Modal Content -->
             <div class="modal">
                 <h2>Edit item details</h2>
@@ -89,18 +91,18 @@
                     </option>
                 </select>
                 <div class="modal-actions">
-                    <button id="edit-cancel-btn" class="btn-secondary">
+                    <button id="edit-item-cancel-btn" class="btn-secondary">
                         Cancel
                     </button>
-                    <button id="edit-submit-btn" class="btn-primary">
+                    <button id="edit-item-submit-btn" class="btn-primary">
                         Update
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Delete Modal Background -->
-        <div id="delete-modal-backdrop" class="modal-backdrop hidden">
+        <!-- Delete Item Modal Background -->
+        <div id="delete-item-modal-backdrop" class="modal-backdrop hidden">
             <!-- Modal Content -->
             <div class="modal">
                 <h2>Confirm Deletion</h2>
@@ -109,10 +111,10 @@
                     <strong id="delete-item-name-display"></strong>?
                 </p>
                 <div class="modal-actions">
-                    <button id="delete-cancel-btn" class="btn-secondary">
+                    <button id="delete-item-cancel-btn" class="btn-secondary">
                         Cancel
                     </button>
-                    <button id="delete-submit-btn" class="btn-danger">
+                    <button id="delete-item-submit-btn" class="btn-danger">
                         Delete
                     </button>
                 </div>

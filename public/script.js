@@ -1,24 +1,32 @@
-const addItemBtn = document.getElementById("add-item-btn");
-const modalBackdrop = document.getElementById("modal-backdrop");
-const cancelBtn = document.getElementById("cancel-btn");
-const submitBtn = document.getElementById("submit-btn");
-const itemInput = document.getElementById("item-input");
-const itemCategory = document.getElementById("item-category");
+// add item
+const newItemBtn = document.getElementById("new-item-btn");
+const newItemModalBackdrop = document.getElementById("new-item-modal-backdrop");
+const newItemCancelBtn = document.getElementById("new-item-cancel-btn");
+const newItemSubmitBtn = document.getElementById("new-item-submit-btn");
+const newItemInput = document.getElementById("item-input");
+const newItemCategory = document.getElementById("item-category");
 const itemsList = document.getElementById("items-list");
 
-const editModalBackdrop = document.getElementById("edit-modal-backdrop");
-const editCancelBtn = document.getElementById("edit-cancel-btn");
-const editSubmitBtn = document.getElementById("edit-submit-btn");
+// edit item
+const editItemModalBackdrop = document.getElementById(
+  "edit-item-modal-backdrop",
+);
+const editItemCancelBtn = document.getElementById("edit-item-cancel-btn");
+const editItemSubmitBtn = document.getElementById("edit-item-submit-btn");
 const editItemInput = document.getElementById("edit-item-input");
 const editItemCategory = document.getElementById("edit-item-category");
 
-const deleteModalBackdrop = document.getElementById("delete-modal-backdrop");
-const deleteCancelBtn = document.getElementById("delete-cancel-btn");
-const deleteSubmitBtn = document.getElementById("delete-submit-btn");
+// delete item
+const deleteItemModalBackdrop = document.getElementById(
+  "delete-item-modal-backdrop",
+);
+const deleteItemCancelBtn = document.getElementById("delete-item-cancel-btn");
+const deleteItemSubmitBtn = document.getElementById("delete-item-submit-btn");
 const deleteItemNameDisplay = document.getElementById(
   "delete-item-name-display",
 );
 
+// grocery list
 const groceryContainer = document.getElementById("grocery-container");
 const groceryList = document.getElementById("grocery-list");
 const clearGroceryListBtn = document.getElementById("clear-grocery-list-btn");
@@ -39,7 +47,7 @@ async function fetchAndPopulateCategories() {
         const option = document.createElement("option");
         option.value = category;
         option.textContent = category;
-        itemCategory.appendChild(option);
+        newItemCategory.appendChild(option);
 
         // Add to edit modal
         const editOption = document.createElement("option");
@@ -107,7 +115,7 @@ async function fetchAndDisplayItems() {
           editItemTargetName = item.name;
           editItemInput.value = item.name;
           editItemCategory.value = item.category;
-          editModalBackdrop.classList.remove("hidden");
+          editItemModalBackdrop.classList.remove("hidden");
         });
 
         const deleteBtn = document.createElement("button");
@@ -117,7 +125,7 @@ async function fetchAndDisplayItems() {
         deleteBtn.addEventListener("click", () => {
           deleteItemTargetName = item.name;
           deleteItemNameDisplay.textContent = item.name;
-          deleteModalBackdrop.classList.remove("hidden");
+          deleteItemModalBackdrop.classList.remove("hidden");
         });
 
         actionsDiv.appendChild(editBtn);
@@ -140,21 +148,21 @@ async function fetchAndDisplayItems() {
 }
 
 // Open modal
-addItemBtn.addEventListener("click", () => {
-  modalBackdrop.classList.remove("hidden");
-  itemInput.value = "";
-  itemInput.focus();
+newItemBtn.addEventListener("click", () => {
+  newItemModalBackdrop.classList.remove("hidden");
+  newItemInput.value = "";
+  newItemInput.focus();
 });
 
 // Close modal
-cancelBtn.addEventListener("click", () => {
-  modalBackdrop.classList.add("hidden");
+newItemCancelBtn.addEventListener("click", () => {
+  newItemModalBackdrop.classList.add("hidden");
 });
 
 // Handle submit
-submitBtn.addEventListener("click", async () => {
-  const name = itemInput.value.trim();
-  const category = itemCategory.value;
+newItemSubmitBtn.addEventListener("click", async () => {
+  const name = newItemInput.value.trim();
+  const category = newItemCategory.value;
 
   if (!name || !category) {
     alert("Please enter a name and select a category.");
@@ -181,9 +189,9 @@ submitBtn.addEventListener("click", async () => {
     });
 
     if (response.ok) {
-      itemInput.value = ""; // Clear input on success
-      itemCategory.value = ""; // Clear category
-      modalBackdrop.classList.add("hidden");
+      newItemInput.value = ""; // Clear input on success
+      newItemCategory.value = ""; // Clear category
+      newItemModalBackdrop.classList.add("hidden");
       await fetchAndDisplayItems(); // Refresh the list
     } else if (response.status === 409) {
       const msg = await response.text();
@@ -198,11 +206,11 @@ submitBtn.addEventListener("click", async () => {
 });
 
 // Edit Handlers
-editCancelBtn.addEventListener("click", () => {
-  editModalBackdrop.classList.add("hidden");
+editItemCancelBtn.addEventListener("click", () => {
+  editItemModalBackdrop.classList.add("hidden");
 });
 
-editSubmitBtn.addEventListener("click", async () => {
+editItemSubmitBtn.addEventListener("click", async () => {
   const name = editItemInput.value.trim();
   const category = editItemCategory.value;
 
@@ -236,7 +244,7 @@ editSubmitBtn.addEventListener("click", async () => {
     );
 
     if (response.ok) {
-      editModalBackdrop.classList.add("hidden");
+      editItemModalBackdrop.classList.add("hidden");
       await fetchAndDisplayItems(); // Refresh the list
     } else {
       alert("Failed to update item.");
@@ -248,11 +256,11 @@ editSubmitBtn.addEventListener("click", async () => {
 });
 
 // Delete Handlers
-deleteCancelBtn.addEventListener("click", () => {
-  deleteModalBackdrop.classList.add("hidden");
+deleteItemCancelBtn.addEventListener("click", () => {
+  deleteItemModalBackdrop.classList.add("hidden");
 });
 
-deleteSubmitBtn.addEventListener("click", async () => {
+deleteItemSubmitBtn.addEventListener("click", async () => {
   try {
     const response = await fetch(
       `/api/items/${encodeURIComponent(deleteItemTargetName)}`,
@@ -262,7 +270,7 @@ deleteSubmitBtn.addEventListener("click", async () => {
     );
 
     if (response.ok) {
-      deleteModalBackdrop.classList.add("hidden");
+      deleteItemModalBackdrop.classList.add("hidden");
       await fetchAndDisplayItems(); // Refresh the list
     } else {
       alert("Failed to delete item.");
