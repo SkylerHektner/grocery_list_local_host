@@ -1,4 +1,4 @@
-use axum::{Json, Router, routing::post};
+use axum::{Json, Router, routing::get};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::Path;
@@ -19,7 +19,7 @@ async fn main() {
 
     // Set up our router. We have an API endpoint and the static fallback.
     let app = Router::new()
-        .route("/api/names", post(add_name))
+        .route("/api/names", get(get_names).post(add_name))
         .fallback_service(ServeDir::new("public"));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -27,6 +27,23 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn get_names() -> Json<Vec<String>> {
+    let file_path = "data/names.ron";
+
+    let names: Vec<String> = if Path::new(file_path).exists() {
+        let content = fs::read_to_string(file_path).await.unwrap_or_default();
+        if content.is_empty() {
+            Vec::new()
+        } else {
+            ron::from_str(&content).unwrap_or_else(|_| Vec::new())
+        }
+    } else {
+        Vec::new()
+    };
+
+    Json(names)
 }
 
 async fn add_name(Json(payload): Json<NewName>) -> String {
