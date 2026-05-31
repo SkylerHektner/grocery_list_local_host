@@ -1,4 +1,9 @@
-use axum::{Json, Router, http::StatusCode, routing::get};
+use axum::{
+    Json, Router,
+    extract::Path as AxumPath,
+    http::StatusCode,
+    routing::{get, patch},
+};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::Path;
@@ -48,6 +53,7 @@ async fn main() {
     // Set up our router. We have an API endpoint and the static fallback.
     let app = Router::new()
         .route("/api/items", get(get_items).post(add_item))
+        .route("/api/items/{name}", patch(update_item).delete(delete_item))
         .route("/api/categories", get(get_categories))
         .fallback_service(ServeDir::new("public"));
 
@@ -79,6 +85,81 @@ async fn get_items() -> Json<Vec<Item>> {
     Json(items)
 }
 
+async fn update_item(
+    AxumPath(old_name): AxumPath<String>,
+    Json(payload): Json<Item>,
+) -> (StatusCode, String) {
+    let file_path = "data/items.ron";
+
+    let mut items: Vec<Item> = if Path::new(file_path).exists() {
+        let content = fs::read_to_string(file_path).await.unwrap_or_default();
+        if content.is_empty() {
+            Vec::new()
+        } else {
+            ron::from_str(&content).unwrap_or_else(|_| Vec::new())
+        }
+    } else {
+        Vec::new()
+    };
+
+    if let Some(item) = items
+        .iter_mut()
+        .find(|i| i.name.eq_ignore_ascii_case(&old_name))
+    {
+        item.name = payload.name.clone();
+        item.category = payload.category;
+
+        let pretty_config = ron::ser::PrettyConfig::default();
+        let ron_string =
+            ron::ser::to_string_pretty(&items, pretty_config).expect("Failed to serialize to RON");
+
+        fs::write(file_path, ron_string)
+            .await
+            .expect("Failed to write to file");
+
+        (
+            StatusCode::OK,
+            format!("Successfully updated {}!", payload.name),
+        )
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Item '{}' not found.", old_name),
+        )
+    }
+}
+
+async fn delete_item(AxumPath(name): AxumPath<String>) -> (StatusCode, String) {
+    let file_path = "data/items.ron";
+
+    let mut items: Vec<Item> = if Path::new(file_path).exists() {
+        let content = fs::read_to_string(file_path).await.unwrap_or_default();
+        if content.is_empty() {
+            Vec::new()
+        } else {
+            ron::from_str(&content).unwrap_or_else(|_| Vec::new())
+        }
+    } else {
+        Vec::new()
+    };
+
+    let initial_len = items.len();
+    items.retain(|i| !i.name.eq_ignore_ascii_case(&name));
+
+    if items.len() < initial_len {
+        let pretty_config = ron::ser::PrettyConfig::default();
+        let ron_string =
+            ron::ser::to_string_pretty(&items, pretty_config).expect("Failed to serialize to RON");
+
+        fs::write(file_path, ron_string)
+            .await
+            .expect("Failed to write to file");
+
+        (StatusCode::OK, format!("Successfully deleted {}!", name))
+    } else {
+        (StatusCode::NOT_FOUND, format!("Item '{}' not found.", name))
+    }
+}
 async fn add_item(Json(payload): Json<Item>) -> (StatusCode, String) {
     let file_path = "data/items.ron";
 

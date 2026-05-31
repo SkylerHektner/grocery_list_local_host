@@ -131,6 +131,36 @@ button:hover {
 .btn-secondary {
     background-color: #6c757d;
 }
-.btn-secondary:hover {
-    background-color: #5a6268;
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+}
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
+.item-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.25rem;
+    color: #6c757d;
+    border-radius: 4px;
+    margin: 0;
+}
+.icon-btn:hover {
+    background-color: #e2e6ea;
+    color: #343a40;
 }

@@ -6,7 +6,22 @@ const itemInput = document.getElementById("item-input");
 const itemCategory = document.getElementById("item-category");
 const itemsList = document.getElementById("items-list");
 
+const editModalBackdrop = document.getElementById("edit-modal-backdrop");
+const editCancelBtn = document.getElementById("edit-cancel-btn");
+const editSubmitBtn = document.getElementById("edit-submit-btn");
+const editItemInput = document.getElementById("edit-item-input");
+const editItemCategory = document.getElementById("edit-item-category");
+
+const deleteModalBackdrop = document.getElementById("delete-modal-backdrop");
+const deleteCancelBtn = document.getElementById("delete-cancel-btn");
+const deleteSubmitBtn = document.getElementById("delete-submit-btn");
+const deleteItemNameDisplay = document.getElementById(
+  "delete-item-name-display",
+);
+
 let currentItems = [];
+let editItemTargetName = "";
+let deleteItemTargetName = "";
 
 // Fetch and populate categories
 async function fetchAndPopulateCategories() {
@@ -15,10 +30,17 @@ async function fetchAndPopulateCategories() {
     if (response.ok) {
       const categories = await response.json();
       categories.forEach((category) => {
+        // Add to main modal
         const option = document.createElement("option");
         option.value = category;
         option.textContent = category;
         itemCategory.appendChild(option);
+
+        // Add to edit modal
+        const editOption = document.createElement("option");
+        editOption.value = category;
+        editOption.textContent = category;
+        editItemCategory.appendChild(editOption);
       });
     } else {
       console.error("Failed to fetch categories");
@@ -56,8 +78,42 @@ async function fetchAndDisplayItems() {
         categorySpan.className = "category-tag";
         categorySpan.textContent = item.category;
 
-        li.appendChild(nameSpan);
-        li.appendChild(categorySpan);
+        const infoDiv = document.createElement("div");
+        infoDiv.style.display = "flex";
+        infoDiv.style.alignItems = "center";
+        infoDiv.style.gap = "0.5rem";
+        infoDiv.appendChild(nameSpan);
+        infoDiv.appendChild(categorySpan);
+
+        const actionsDiv = document.createElement("div");
+        actionsDiv.className = "item-actions";
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "icon-btn";
+        editBtn.textContent = "✏️";
+        editBtn.title = "Edit Item";
+        editBtn.addEventListener("click", () => {
+          editItemTargetName = item.name;
+          editItemInput.value = item.name;
+          editItemCategory.value = item.category;
+          editModalBackdrop.classList.remove("hidden");
+        });
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "icon-btn";
+        deleteBtn.textContent = "🗑️";
+        deleteBtn.title = "Delete Item";
+        deleteBtn.addEventListener("click", () => {
+          deleteItemTargetName = item.name;
+          deleteItemNameDisplay.textContent = item.name;
+          deleteModalBackdrop.classList.remove("hidden");
+        });
+
+        actionsDiv.appendChild(editBtn);
+        actionsDiv.appendChild(deleteBtn);
+
+        li.appendChild(infoDiv);
+        li.appendChild(actionsDiv);
         itemsList.appendChild(li);
       });
     } else {
@@ -123,6 +179,82 @@ submitBtn.addEventListener("click", async () => {
       alert(msg);
     } else {
       alert("Failed to add item.");
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    alert("An error occurred.");
+  }
+});
+
+// Edit Handlers
+editCancelBtn.addEventListener("click", () => {
+  editModalBackdrop.classList.add("hidden");
+});
+
+editSubmitBtn.addEventListener("click", async () => {
+  const name = editItemInput.value.trim();
+  const category = editItemCategory.value;
+
+  if (!name || !category) {
+    alert("Please enter a name and select a category.");
+    return;
+  }
+
+  // Check for duplicates if the name changed
+  if (name.toLowerCase() !== editItemTargetName.toLowerCase()) {
+    const isDuplicate = currentItems.some(
+      (item) => item.name.toLowerCase() === name.toLowerCase(),
+    );
+
+    if (isDuplicate) {
+      alert(`The item "${name}" is already on your list!`);
+      return;
+    }
+  }
+
+  try {
+    const response = await fetch(
+      `/api/items/${encodeURIComponent(editItemTargetName)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: name, category: category }),
+      },
+    );
+
+    if (response.ok) {
+      editModalBackdrop.classList.add("hidden");
+      await fetchAndDisplayItems(); // Refresh the list
+    } else {
+      alert("Failed to update item.");
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    alert("An error occurred.");
+  }
+});
+
+// Delete Handlers
+deleteCancelBtn.addEventListener("click", () => {
+  deleteModalBackdrop.classList.add("hidden");
+});
+
+deleteSubmitBtn.addEventListener("click", async () => {
+  try {
+    const response = await fetch(
+      `/api/items/${encodeURIComponent(deleteItemTargetName)}`,
+      {
+        method: "DELETE",
+      },
+    );
+
+    if (response.ok) {
+      deleteModalBackdrop.classList.add("hidden");
+      await fetchAndDisplayItems(); // Refresh the list
+    } else {
+      alert("Failed to delete item.");
     }
   } catch (error) {
     console.error("Error:", error);

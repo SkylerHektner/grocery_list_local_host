@@ -38,6 +38,52 @@
             </div>
         </div>
 
+        <!-- Edit Modal Background -->
+        <div id="edit-modal-backdrop" class="modal-backdrop hidden">
+            <!-- Modal Content -->
+            <div class="modal">
+                <h2>Edit item details</h2>
+                <input
+                    type="text"
+                    id="edit-item-input"
+                    placeholder="Item name..."
+                />
+                <select id="edit-item-category">
+                    <option value="" disabled selected>
+                        Select a category...
+                    </option>
+                </select>
+                <div class="modal-actions">
+                    <button id="edit-cancel-btn" class="btn-secondary">
+                        Cancel
+                    </button>
+                    <button id="edit-submit-btn" class="btn-primary">
+                        Update
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Modal Background -->
+        <div id="delete-modal-backdrop" class="modal-backdrop hidden">
+            <!-- Modal Content -->
+            <div class="modal">
+                <h2>Confirm Deletion</h2>
+                <p>
+                    Are you sure you want to delete
+                    <strong id="delete-item-name-display"></strong>?
+                </p>
+                <div class="modal-actions">
+                    <button id="delete-cancel-btn" class="btn-secondary">
+                        Cancel
+                    </button>
+                    <button id="delete-submit-btn" class="btn-danger">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <script src="/script.js"></script>
     </body>
 </html>
