@@ -3,16 +3,19 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs;
 
+const GROCERY_LIST_FILE_PATH: &str = "data/grocery_list.ron";
+
 #[derive(Deserialize, Serialize, Clone)]
 pub struct GroceryListPayload {
     pub name: String,
 }
 
-pub async fn get_grocery_list() -> Json<Vec<String>> {
-    let file_path = "data/grocery_list.ron";
+async fn load_grocery_list() -> Vec<String> {
+    if Path::new(GROCERY_LIST_FILE_PATH).exists() {
+        let content = fs::read_to_string(GROCERY_LIST_FILE_PATH)
+            .await
+            .unwrap_or_default();
 
-    let items: Vec<String> = if Path::new(file_path).exists() {
-        let content = fs::read_to_string(file_path).await.unwrap_or_default();
         if content.is_empty() {
             Vec::new()
         } else {
@@ -20,53 +23,73 @@ pub async fn get_grocery_list() -> Json<Vec<String>> {
         }
     } else {
         Vec::new()
-    };
+    }
+}
 
-    Json(items)
+async fn save_grocery_list(items: &[String]) {
+    let pretty_config = ron::ser::PrettyConfig::default();
+    let ron_string =
+        ron::ser::to_string_pretty(items, pretty_config).expect("Failed to serialize to RON");
+
+    fs::write(GROCERY_LIST_FILE_PATH, ron_string)
+        .await
+        .expect("Failed to write to file");
+}
+
+pub async fn get_grocery_list() -> Json<Vec<String>> {
+    Json(load_grocery_list().await)
 }
 
 pub async fn add_to_grocery_list(Json(payload): Json<GroceryListPayload>) -> (StatusCode, String) {
-    let file_path = "data/grocery_list.ron";
+    let mut items = load_grocery_list().await;
 
-    let mut items: Vec<String> = if Path::new(file_path).exists() {
-        let content = fs::read_to_string(file_path).await.unwrap_or_default();
-        if content.is_empty() {
-            Vec::new()
-        } else {
-            ron::from_str(&content).unwrap_or_else(|_| Vec::new())
-        }
-    } else {
-        Vec::new()
-    };
-
-    if !items.iter().any(|item| item.eq_ignore_ascii_case(&payload.name)) {
+    if !items
+        .iter()
+        .any(|item| item.eq_ignore_ascii_case(&payload.name))
+    {
         items.push(payload.name.clone());
+        save_grocery_list(&items).await;
 
-        let pretty_config = ron::ser::PrettyConfig::default();
-        let ron_string =
-            ron::ser::to_string_pretty(&items, pretty_config).expect("Failed to serialize to RON");
-
-        fs::write(file_path, ron_string)
-            .await
-            .expect("Failed to write to file");
-
-        (StatusCode::OK, format!("Successfully added {} to grocery list!", payload.name))
+        (
+            StatusCode::OK,
+            format!("Successfully added {} to grocery list!", payload.name),
+        )
     } else {
-        (StatusCode::CONFLICT, format!("Item '{}' already in grocery list.", payload.name))
+        (
+            StatusCode::CONFLICT,
+            format!("Item '{}' already in grocery list.", payload.name),
+        )
+    }
+}
+
+pub async fn delete_from_grocery_list(
+    Json(payload): Json<GroceryListPayload>,
+) -> (StatusCode, String) {
+    let mut items = load_grocery_list().await;
+    let original_len = items.len();
+
+    items.retain(|item| !item.eq_ignore_ascii_case(&payload.name));
+
+    if items.len() == original_len {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Item '{}' not found in grocery list.", payload.name),
+        )
+    } else {
+        save_grocery_list(&items).await;
+        (
+            StatusCode::OK,
+            format!("Successfully removed {} from grocery list!", payload.name),
+        )
     }
 }
 
 pub async fn delete_grocery_list() -> (StatusCode, String) {
-    let file_path = "data/grocery_list.ron";
-
     let items: Vec<String> = Vec::new();
-    let pretty_config = ron::ser::PrettyConfig::default();
-    let ron_string =
-        ron::ser::to_string_pretty(&items, pretty_config).expect("Failed to serialize to RON");
+    save_grocery_list(&items).await;
 
-    fs::write(file_path, ron_string)
-        .await
-        .expect("Failed to write to file");
-
-    (StatusCode::OK, "Successfully cleared grocery list!".to_string())
+    (
+        StatusCode::OK,
+        "Successfully cleared grocery list!".to_string(),
+    )
 }

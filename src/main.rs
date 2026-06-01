@@ -5,7 +5,9 @@ use axum::{
     Router,
     routing::{get, patch},
 };
-use grocery_list::{add_to_grocery_list, delete_grocery_list, get_grocery_list};
+use grocery_list::{
+    add_to_grocery_list, delete_from_grocery_list, delete_grocery_list, get_grocery_list,
+};
 use items::{add_item, delete_item, get_categories, get_items, update_item};
 use std::net::SocketAddr;
 use std::path::Path;
@@ -29,6 +31,10 @@ async fn main() {
             get(get_grocery_list)
                 .post(add_to_grocery_list)
                 .delete(delete_grocery_list),
+        )
+        .route(
+            "/api/grocery_list/delete",
+            axum::routing::post(delete_from_grocery_list),
         )
         .fallback_service(ServeDir::new("public"));
 

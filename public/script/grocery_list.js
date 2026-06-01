@@ -77,6 +77,42 @@ async function addToGroceryList(name) {
   }
 }
 
+async function removeFromGroceryList(name) {
+  try {
+    const response = await fetch("/api/grocery_list/delete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name }),
+    });
+
+    if (response.ok) {
+      await fetchAndDisplayGroceryList();
+    } else if (response.status === 404) {
+      console.log(`Item "${name}" was not found in the grocery list`);
+    } else {
+      alert("Failed to remove item from grocery list.");
+    }
+  } catch (error) {
+    console.error("Error removing grocery list item:", error);
+  }
+}
+
+document.addEventListener("add-item-to-grocery-list", async (event) => {
+  const itemName = event.detail?.name;
+  if (itemName) {
+    await addToGroceryList(itemName);
+  }
+});
+
+document.addEventListener("remove-item-from-grocery-list", async (event) => {
+  const itemName = event.detail?.name;
+  if (itemName) {
+    await removeFromGroceryList(itemName);
+  }
+});
+
 // Drag and drop event listeners
 groceryContainer.addEventListener("dragover", (e) => {
   e.preventDefault();

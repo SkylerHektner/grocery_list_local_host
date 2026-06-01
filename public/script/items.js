@@ -30,6 +30,14 @@ export let currentItems = [];
 let editItemTargetName = "";
 let deleteItemTargetName = "";
 
+function emitGroceryListEvent(eventName, name) {
+  document.dispatchEvent(
+    new CustomEvent(eventName, {
+      detail: { name },
+    }),
+  );
+}
+
 export async function fetchAndPopulateCategories() {
   try {
     const response = await fetch("/api/categories");
@@ -95,11 +103,39 @@ export async function fetchAndDisplayItems() {
         li.style.display = "flex";
         li.style.justifyContent = "space-between";
         li.style.alignItems = "center";
+        li.tabIndex = -1;
+        li.dataset.itemName = item.name;
 
         // Make items draggable
         li.draggable = true;
         li.addEventListener("dragstart", (e) => {
           e.dataTransfer.setData("text/plain", item.name);
+        });
+        li.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowUp") {
+            if (moveFocusedItem(-1, li)) {
+              e.preventDefault();
+            }
+            return;
+          }
+
+          if (e.key === "ArrowDown") {
+            if (moveFocusedItem(1, li)) {
+              e.preventDefault();
+            }
+            return;
+          }
+
+          if (e.key === "ArrowRight" || e.key === "Enter") {
+            e.preventDefault();
+            emitGroceryListEvent("add-item-to-grocery-list", item.name);
+            return;
+          }
+
+          if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            emitGroceryListEvent("remove-item-from-grocery-list", item.name);
+          }
         });
 
         const nameSpan = document.createElement("span");
@@ -123,6 +159,7 @@ export async function fetchAndDisplayItems() {
           editItemInput.value = item.name;
           editItemCategory.value = item.category;
           editItemModalBackdrop.classList.remove("hidden");
+          editItemInput.focus();
         });
 
         const deleteBtn = document.createElement("button");
@@ -217,6 +254,12 @@ editItemCancelBtn.addEventListener("click", () => {
   editItemModalBackdrop.classList.add("hidden");
 });
 
+editItemInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    editItemSubmitBtn.click();
+  }
+});
+
 editItemSubmitBtn.addEventListener("click", async () => {
   const name = editItemInput.value.trim();
   const category = editItemCategory.value;
@@ -287,3 +330,148 @@ deleteItemSubmitBtn.addEventListener("click", async () => {
     alert("An error occurred.");
   }
 });
+
+// Move focus using arrow keys
+
+function moveFocusedItem(direction, currentElement) {
+  const itemElements = getFocusableItemElements();
+  const currentIndex = itemElements.findIndex(
+    (element) => element === currentElement,
+  );
+
+  if (currentIndex === -1) {
+    return false;
+  }
+
+  const nextIndex = currentIndex + direction;
+  const nextElement = itemElements[nextIndex];
+
+  if (!nextElement) {
+    return false;
+  }
+
+  nextElement.focus();
+  nextElement.scrollIntoView({ block: "nearest" });
+  return true;
+}
+
+// global search
+
+let typeaheadBuffer = "";
+let typeaheadResetTimeout = null;
+
+function isTypingContext(element) {
+  if (!element) {
+    return false;
+  }
+
+  const tagName = element.tagName;
+  return (
+    element.isContentEditable ||
+    tagName === "INPUT" ||
+    tagName === "TEXTAREA" ||
+    tagName === "SELECT"
+  );
+}
+
+function resetTypeaheadBuffer() {
+  typeaheadBuffer = "";
+
+  if (typeaheadResetTimeout) {
+    clearTimeout(typeaheadResetTimeout);
+    typeaheadResetTimeout = null;
+  }
+}
+
+function scheduleTypeaheadReset() {
+  if (typeaheadResetTimeout) {
+    clearTimeout(typeaheadResetTimeout);
+  }
+
+  typeaheadResetTimeout = setTimeout(() => {
+    typeaheadBuffer = "";
+    typeaheadResetTimeout = null;
+  }, 1000);
+}
+
+function getFocusableItemElements() {
+  return Array.from(itemsList.querySelectorAll("li[data-item-name]"));
+}
+
+function focusMatchingItem(searchText) {
+  if (!searchText) {
+    return false;
+  }
+
+  const itemElements = getFocusableItemElements();
+
+  if (itemElements.length === 0) {
+    return false;
+  }
+
+  const normalizedSearch = searchText.toLowerCase();
+  const activeIndex = itemElements.findIndex(
+    (element) => element === document.activeElement,
+  );
+
+  const orderedElements =
+    activeIndex >= 0
+      ? [
+          ...itemElements.slice(activeIndex + 1),
+          ...itemElements.slice(0, activeIndex + 1),
+        ]
+      : itemElements;
+
+  const match = orderedElements.find((element) =>
+    element.dataset.itemName.toLowerCase().startsWith(normalizedSearch),
+  );
+
+  if (!match) {
+    return false;
+  }
+
+  match.focus();
+  match.scrollIntoView({ block: "nearest" });
+  return true;
+}
+
+function handleGlobalItemTypeahead(event) {
+  if (
+    event.defaultPrevented ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
+    isTypingContext(event.target)
+  ) {
+    return;
+  }
+
+  if (event.key === "Escape") {
+    resetTypeaheadBuffer();
+    return;
+  }
+
+  if (event.key.length !== 1 || event.key.trim() === "") {
+    return;
+  }
+
+  const nextBuffer = `${typeaheadBuffer}${event.key.toLowerCase()}`;
+
+  if (focusMatchingItem(nextBuffer)) {
+    typeaheadBuffer = nextBuffer;
+    scheduleTypeaheadReset();
+    event.preventDefault();
+    return;
+  }
+
+  if (focusMatchingItem(event.key)) {
+    typeaheadBuffer = event.key.toLowerCase();
+    scheduleTypeaheadReset();
+    event.preventDefault();
+    return;
+  }
+
+  resetTypeaheadBuffer();
+}
+
+document.addEventListener("keydown", handleGlobalItemTypeahead);

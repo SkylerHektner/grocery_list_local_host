@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs;
 
+const ITEMS_FILE_PATH: &str = "data/items.ron";
+
 // Categories
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -68,10 +70,10 @@ fn format_item_name(name: &str) -> String {
 }
 
 pub async fn get_items() -> Json<Vec<Item>> {
-    let file_path = "data/items.ron";
-
-    let items: Vec<Item> = if Path::new(file_path).exists() {
-        let content = fs::read_to_string(file_path).await.unwrap_or_default();
+    let items: Vec<Item> = if Path::new(ITEMS_FILE_PATH).exists() {
+        let content = fs::read_to_string(ITEMS_FILE_PATH)
+            .await
+            .unwrap_or_default();
         if content.is_empty() {
             Vec::new()
         } else {
@@ -88,11 +90,12 @@ pub async fn update_item(
     AxumPath(old_name): AxumPath<String>,
     Json(payload): Json<Item>,
 ) -> (StatusCode, String) {
-    let file_path = "data/items.ron";
     let formatted_name = format_item_name(&payload.name);
 
-    let mut items: Vec<Item> = if Path::new(file_path).exists() {
-        let content = fs::read_to_string(file_path).await.unwrap_or_default();
+    let mut items: Vec<Item> = if Path::new(ITEMS_FILE_PATH).exists() {
+        let content = fs::read_to_string(ITEMS_FILE_PATH)
+            .await
+            .unwrap_or_default();
         if content.is_empty() {
             Vec::new()
         } else {
@@ -113,7 +116,7 @@ pub async fn update_item(
         let ron_string =
             ron::ser::to_string_pretty(&items, pretty_config).expect("Failed to serialize to RON");
 
-        fs::write(file_path, ron_string)
+        fs::write(ITEMS_FILE_PATH, ron_string)
             .await
             .expect("Failed to write to file");
 
@@ -130,10 +133,10 @@ pub async fn update_item(
 }
 
 pub async fn delete_item(AxumPath(name): AxumPath<String>) -> (StatusCode, String) {
-    let file_path = "data/items.ron";
-
-    let mut items: Vec<Item> = if Path::new(file_path).exists() {
-        let content = fs::read_to_string(file_path).await.unwrap_or_default();
+    let mut items: Vec<Item> = if Path::new(ITEMS_FILE_PATH).exists() {
+        let content = fs::read_to_string(ITEMS_FILE_PATH)
+            .await
+            .unwrap_or_default();
         if content.is_empty() {
             Vec::new()
         } else {
@@ -151,7 +154,7 @@ pub async fn delete_item(AxumPath(name): AxumPath<String>) -> (StatusCode, Strin
         let ron_string =
             ron::ser::to_string_pretty(&items, pretty_config).expect("Failed to serialize to RON");
 
-        fs::write(file_path, ron_string)
+        fs::write(ITEMS_FILE_PATH, ron_string)
             .await
             .expect("Failed to write to file");
 
@@ -162,12 +165,13 @@ pub async fn delete_item(AxumPath(name): AxumPath<String>) -> (StatusCode, Strin
 }
 
 pub async fn add_item(Json(payload): Json<Item>) -> (StatusCode, String) {
-    let file_path = "data/items.ron";
     let formatted_name = format_item_name(&payload.name);
 
     // 1. Read the existing items from the file (if it exists)
-    let mut items: Vec<Item> = if Path::new(file_path).exists() {
-        let content = fs::read_to_string(file_path).await.unwrap_or_default();
+    let mut items: Vec<Item> = if Path::new(ITEMS_FILE_PATH).exists() {
+        let content = fs::read_to_string(ITEMS_FILE_PATH)
+            .await
+            .unwrap_or_default();
         if content.is_empty() {
             Vec::new()
         } else {
@@ -199,7 +203,7 @@ pub async fn add_item(Json(payload): Json<Item>) -> (StatusCode, String) {
         ron::ser::to_string_pretty(&items, pretty_config).expect("Failed to serialize to RON");
 
     // 5. Save the file
-    fs::write(file_path, ron_string)
+    fs::write(ITEMS_FILE_PATH, ron_string)
         .await
         .expect("Failed to write to file");
 
