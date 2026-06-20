@@ -24,8 +24,7 @@ body {
     margin-top: 2rem;
     text-align: left;
 }
-.items-column,
-.grocery-column {
+.items-column {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -52,50 +51,31 @@ button:hover {
 }
 
 /* Items List Styles */
-.items-container,
-.grocery-container {
+.items-container {
     border-top: 1px solid #eee;
     padding-top: 1rem;
     margin-top: 1rem;
     flex-grow: 1;
     min-height: 250px;
 }
-.grocery-container {
-    background-color: #f8f9fa;
-    border: 2px dashed #ccc;
-    border-radius: 8px;
-    padding: 1rem;
-    position: relative;
-    transition:
-        background-color 0.2s,
-        border-color 0.2s;
-}
-.grocery-container.drag-over {
-    background-color: #e2e6ea;
-    border-color: #007bff;
-}
-.drop-hint {
-    text-align: center;
-    color: #888;
-    font-style: italic;
-    margin-bottom: 1rem;
-}
-.items-column h2,
-.grocery-column h2 {
+.items-column h2 {
     font-size: 1.25rem;
     color: #333;
     margin-bottom: 0.5rem;
 }
-#items-list,
-#grocery-list {
+.grid-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem;
+}
+#items-list {
     list-style-type: none;
     padding: 0;
     margin: 0;
     max-height: 800px;
     overflow-y: auto;
 }
-#items-list li,
-#grocery-list li {
+#items-list li {
     background: #f8f9fa;
     margin-bottom: 0.5rem;
     padding: 0.75rem 1rem;
@@ -103,8 +83,7 @@ button:hover {
     border: 1px solid #e9ecef;
     color: #444;
 }
-#items-list li.empty-message,
-#grocery-list li.empty-message {
+#items-list li.empty-message {
     text-align: center;
     background: none;
     border: none;

@@ -87,6 +87,7 @@ export async function fetchAndDisplayItems() {
       });
 
       let currentCategory = null;
+      let currentCategoryGridList = null;
 
       items.forEach((item) => {
         if (item.category !== currentCategory) {
@@ -97,6 +98,10 @@ export async function fetchAndDisplayItems() {
             currentCategory === null ? "0" : "1rem";
           itemsList.appendChild(categoryHeader);
           currentCategory = item.category;
+
+          currentCategoryGridList = document.createElement("ul");
+          currentCategoryGridList.className = "grid-list";
+          itemsList.appendChild(currentCategoryGridList);
         }
 
         const li = document.createElement("li");
@@ -106,11 +111,6 @@ export async function fetchAndDisplayItems() {
         li.tabIndex = -1;
         li.dataset.itemName = item.name;
 
-        // Make items draggable
-        li.draggable = true;
-        li.addEventListener("dragstart", (e) => {
-          e.dataTransfer.setData("text/plain", item.name);
-        });
         li.addEventListener("keydown", (e) => {
           if (e.key === "ArrowUp") {
             if (moveFocusedItem(-1, li)) {
@@ -177,7 +177,7 @@ export async function fetchAndDisplayItems() {
 
         li.appendChild(infoDiv);
         li.appendChild(actionsDiv);
-        itemsList.appendChild(li);
+        currentCategoryGridList.appendChild(li);
       });
     } else {
       console.error("Failed to fetch items");
