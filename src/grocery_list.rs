@@ -155,3 +155,20 @@ pub async fn delete_grocery_list() -> (StatusCode, String) {
         "Successfully cleared grocery list!".to_string(),
     )
 }
+
+pub async fn rename_item_in_grocery_list(old_name: &str, new_name: &str) {
+    let mut items = load_grocery_list().await;
+    let mut renamed = false;
+
+    for item in items.iter_mut() {
+        if item.eq_ignore_ascii_case(old_name) {
+            *item = new_name.to_string();
+            renamed = true;
+            break;
+        }
+    }
+
+    if renamed {
+        save_grocery_list(&items).await;
+    } 
+}

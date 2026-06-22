@@ -2,9 +2,9 @@ use axum::{Json, extract::Path as AxumPath, http::StatusCode};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs;
-use crate::grocery_list::delete_from_grocery_list_str;
+use crate::grocery_list::{delete_from_grocery_list_str, rename_item_in_grocery_list};
 use crate::utils::format_name;
-use crate::recipe::any_recipe_contains_item;
+use crate::recipe::{any_recipe_contains_item, rename_item_in_recipes};
 
 const ITEMS_FILE_PATH: &str = "data/items.ron";
 
@@ -89,6 +89,9 @@ pub async fn update_item(
         .iter_mut()
         .find(|i| i.name.eq_ignore_ascii_case(&old_name))
     {
+        rename_item_in_recipes(&old_name, &formatted_name).await;
+        rename_item_in_grocery_list(&old_name, &formatted_name).await;
+
         item.name = formatted_name.clone();
         item.category = payload.category;
 

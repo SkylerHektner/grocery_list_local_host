@@ -215,3 +215,39 @@ pub async fn edit_recipe(Json(payload): Json<EditRecipePayload>) -> (StatusCode,
         format!("Successfully updated recipe!"),
     )
 }
+
+pub async fn rename_item_in_recipes(old_item_name: &str, new_item_name: &str) {
+    let mut recipes: Vec<Recipe> = if Path::new(RECIPES_FILE_PATH).exists() {
+        let content = fs::read_to_string(RECIPES_FILE_PATH)
+            .await
+            .unwrap_or_default();
+        if content.is_empty() {
+            Vec::new()
+        } else {
+            ron::from_str(&content).unwrap_or_else(|_| Vec::new())
+        }
+    } else {
+        Vec::new()
+    };
+
+    let mut item_found = false;
+
+    for recipe in &mut recipes {
+        for item in &mut recipe.items {
+            if item.eq_ignore_ascii_case(old_item_name) {
+                *item = new_item_name.to_string();
+                item_found = true;
+            }
+        }
+    }
+
+    if item_found {
+        let pretty_config = ron::ser::PrettyConfig::default();
+        let ron_string =
+            ron::ser::to_string_pretty(&recipes, pretty_config).expect("Failed to serialize to RON");
+
+        fs::write(RECIPES_FILE_PATH, ron_string)
+            .await
+            .expect("Failed to write to file");
+    }
+}
