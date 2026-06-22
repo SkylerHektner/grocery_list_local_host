@@ -10,6 +10,11 @@ pub struct GroceryListPayload {
     pub name: String,
 }
 
+#[derive(Deserialize)]
+pub struct GroceryListBatchPayload {
+    pub items: Vec<String>,
+}
+
 async fn load_grocery_list() -> Vec<String> {
     if Path::new(GROCERY_LIST_FILE_PATH).exists() {
         let content = fs::read_to_string(GROCERY_LIST_FILE_PATH)
@@ -41,31 +46,84 @@ pub async fn get_grocery_list() -> Json<Vec<String>> {
 }
 
 pub async fn add_to_grocery_list(Json(payload): Json<GroceryListPayload>) -> (StatusCode, String) {
+    let batch_payload = GroceryListBatchPayload {
+        items: vec![payload.name],
+    };
+    add_items_to_grocery_list(Json(batch_payload)).await
+}
+
+pub async fn add_items_to_grocery_list(Json(payload): Json<GroceryListBatchPayload>) -> (StatusCode, String) {
     let mut items = load_grocery_list().await;
+    let mut added = Vec::new();
+    let mut duplicates = Vec::new();
 
-    if !items
-        .iter()
-        .any(|item| item.eq_ignore_ascii_case(&payload.name))
-    {
-        items.push(payload.name.clone());
-        save_grocery_list(&items).await;
+    for name in payload.items {
+        if !items
+            .iter()
+            .any(|item| item.eq_ignore_ascii_case(&name))
+        {
+            items.push(name.clone());
+            added.push(name);
+        } else {
+            duplicates.push(name);
+        }
+    }
 
-        (
-            StatusCode::OK,
-            format!("Successfully added {} to grocery list!", payload.name),
-        )
-    } else {
+    if added.is_empty() {
         (
             StatusCode::CONFLICT,
-            format!("Item '{}' already in grocery list.", payload.name),
+            format!("All items already in grocery list: {:?}", duplicates),
         )
+    } else {
+        save_grocery_list(&items).await;
+        let message = if duplicates.is_empty() {
+            format!("Successfully added {} items!", added.len())
+        } else {
+            format!("Added {} items. Skipped duplicates: {:?}", added.len(), duplicates)
+        };
+        (StatusCode::OK, message)
     }
 }
 
 pub async fn delete_from_grocery_list(
     Json(payload): Json<GroceryListPayload>,
 ) -> (StatusCode, String) {
-    delete_from_grocery_list_str(&payload.name).await
+    let batch_payload = GroceryListBatchPayload {
+        items: vec![payload.name],
+    };
+    delete_items_from_grocery_list(Json(batch_payload)).await
+}
+
+pub async fn delete_items_from_grocery_list(Json(payload): Json<GroceryListBatchPayload>) -> (StatusCode, String) {
+    let mut items = load_grocery_list().await;
+    let mut removed = Vec::new();
+    let mut not_found = Vec::new();
+
+    for name in payload.items {
+        let original_len = items.len();
+        items.retain(|item| !item.eq_ignore_ascii_case(&name));
+
+        if items.len() == original_len {
+            not_found.push(name);
+        } else {
+            removed.push(name);
+        }
+    }
+
+    if removed.is_empty() {
+        (
+            StatusCode::NOT_FOUND,
+            format!("No items found: {:?}", not_found),
+        )
+    } else {
+        save_grocery_list(&items).await;
+        let message = if not_found.is_empty() {
+            format!("Successfully removed {} items!", removed.len())
+        } else {
+            format!("Removed {} items. Not found: {:?}", removed.len(), not_found)
+        };
+        (StatusCode::OK, message)
+    }
 }
 
 pub async fn delete_from_grocery_list_str(name: &str) -> (StatusCode, String) {

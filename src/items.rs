@@ -4,6 +4,7 @@ use std::path::Path;
 use tokio::fs;
 use crate::grocery_list::delete_from_grocery_list_str;
 use crate::utils::format_name;
+use crate::recipe::any_recipe_contains_item;
 
 const ITEMS_FILE_PATH: &str = "data/items.ron";
 
@@ -124,6 +125,13 @@ pub async fn delete_item(AxumPath(name): AxumPath<String>) -> (StatusCode, Strin
     } else {
         Vec::new()
     };
+
+    if any_recipe_contains_item(&name).await {
+        return (
+            StatusCode::CONFLICT,
+            format!("Cannot delete '{}'. It is used in a recipe.", name),
+        );
+    }
 
     let initial_len = items.len();
     items.retain(|i| !i.name.eq_ignore_ascii_case(&name));

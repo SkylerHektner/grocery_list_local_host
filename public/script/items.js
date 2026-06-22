@@ -60,7 +60,7 @@ export async function fetchAndPopulateCategories() {
         editItemCategory.appendChild(editOption);
       });
     } else {
-      console.error("Failed to fetch categories");
+      alert(await response.text() || "Failed to fetch categories");
     }
   } catch (error) {
     console.error("Error fetching categories:", error);
@@ -264,7 +264,7 @@ newItemSubmitBtn.addEventListener("click", async () => {
       const msg = await response.text();
       alert(msg);
     } else {
-      alert("Failed to add item.");
+      alert(await response.text() || "Failed to add item.");
     }
   } catch (error) {
     console.error("Error:", error);
@@ -320,7 +320,7 @@ editItemSubmitBtn.addEventListener("click", async () => {
       editItemModalBackdrop.classList.add("hidden");
       await fetchAndDisplayItems(); // Refresh the list
     } else {
-      alert("Failed to update item.");
+      alert(await response.text() || "Failed to update item.");
     }
   } catch (error) {
     console.error("Error:", error);
@@ -346,7 +346,7 @@ deleteItemSubmitBtn.addEventListener("click", async () => {
       deleteItemModalBackdrop.classList.add("hidden");
       await fetchAndDisplayItems(); // Refresh the list
     } else {
-      alert("Failed to delete item.");
+      alert(await response.text() || "Failed to delete item.");
     }
   } catch (error) {
     console.error("Error:", error);
@@ -517,7 +517,7 @@ async function addToGroceryList(name) {
       // Ignore conflict silently or show a small toast, but simple alert for now
       console.log(`Item "${name}" already in grocery list`);
     } else {
-      alert("Failed to add to grocery list.");
+      alert(await response.text() || "Failed to add to grocery list.");
     }
   } catch (error) {
     console.error("Error:", error);
@@ -539,7 +539,7 @@ async function removeFromGroceryList(name) {
     } else if (response.status === 404) {
       console.log(`Item "${name}" was not found in the grocery list`);
     } else {
-      alert("Failed to remove item from grocery list.");
+      alert(await response.text() || "Failed to remove item from grocery list.");
     }
   } catch (error) {
     console.error("Error removing grocery list item:", error);
@@ -569,7 +569,7 @@ clearGroceryListBtn.addEventListener("click", async () => {
       if (response.ok) {
         await fetchAndDisplayItems();
       } else {
-        alert("Failed to clear grocery list");
+        alert(await response.text() || "Failed to clear grocery list");
       }
     } catch (error) {
       console.error("Error clearing grocery list:", error);

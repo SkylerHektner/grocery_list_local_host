@@ -15,7 +15,6 @@
                 <div class="items-column">
                     <h2>Available Items</h2>
                     <button id="new-item-btn">Add New Item</button>
-                    <button id="new-recipe-btn">Add New Recipe</button>
                     <button id="clear-grocery-list-btn">Clear Grocery List</button>
                     <div class="items-container">
                         <ul id="items-list" aria-label="Available items">
@@ -27,6 +26,7 @@
                 <!-- Right Column: Recipes -->
                 <div class="recipes-column">
                     <h2>Recipes</h2>
+                    <button id="new-recipe-btn">Add New Recipe</button>
                     <div class="recipes-container">
                         <ul id="recipes-list" aria-label="Available recipes">
                             <li>Loading...</li>
@@ -132,6 +132,56 @@
                     </button>
                     <button id="new-recipe-submit-btn" class="btn-primary">
                         Create Recipe
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Recipe Modal Background -->
+        <div id="edit-recipe-modal-backdrop" class="modal-backdrop hidden">
+            <!-- Modal Content -->
+            <div class="modal">
+                <h2>Edit Recipe</h2>
+                <input type="text" id="edit-recipe-name-input" placeholder="Recipe name..." />
+                <div class="recipe-items-section">
+                    <label for="edit-recipe-item-select">Add Items:</label>
+                    <div class="recipe-item-input-group">
+                        <select id="edit-recipe-item-select">
+                            <option value="" disabled selected>
+                                Select an item...
+                            </option>
+                        </select>
+                        <button id="edit-recipe-add-item-btn" class="btn-secondary">Add</button>
+                    </div>
+                    <ul id="edit-recipe-items-list" aria-label="Edit recipe items">
+                    </ul>
+                </div>
+                <div class="modal-actions">
+                    <button id="edit-recipe-cancel-btn" class="btn-secondary">
+                        Cancel
+                    </button>
+                    <button id="edit-recipe-submit-btn" class="btn-primary">
+                        Update Recipe
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Recipe Modal Background -->
+        <div id="delete-recipe-modal-backdrop" class="modal-backdrop hidden">
+            <!-- Modal Content -->
+            <div class="modal">
+                <h2>Confirm Deletion</h2>
+                <p>
+                    Are you sure you want to delete the recipe
+                    <strong id="delete-recipe-name-display"></strong>?
+                </p>
+                <div class="modal-actions">
+                    <button id="delete-recipe-cancel-btn" class="btn-secondary">
+                        Cancel
+                    </button>
+                    <button id="delete-recipe-submit-btn" class="btn-danger">
+                        Delete
                     </button>
                 </div>
             </div>
