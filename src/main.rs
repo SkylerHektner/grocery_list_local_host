@@ -1,5 +1,7 @@
 mod grocery_list;
 mod items;
+mod recipe;
+mod utils;
 
 use axum::{
     Router,
@@ -33,6 +35,8 @@ async fn main() {
                 .delete(delete_grocery_list),
         )
         .route("/api/grocery_list/delete", post(delete_from_grocery_list))
+        .route("/api/recipes", post(recipe::add_recipe))
+        .route("/api/recipes", get(recipe::get_recipes))
         .fallback_service(ServeDir::new("public"));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

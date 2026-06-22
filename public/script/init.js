@@ -1,9 +1,18 @@
-import { fetchAndPopulateCategories, fetchAndDisplayItems } from "./items.js";
+import {
+  fetchAndPopulateCategories,
+  fetchAndDisplayItems,
+  currentItems,
+} from "./items.js";
+import { fetchAndDisplayRecipes, initializeRecipeModal } from "./recipe.js";
 
-// Load data when the page starts
 async function init() {
   await fetchAndPopulateCategories();
   await fetchAndDisplayItems();
+  await fetchAndDisplayRecipes();
+  initializeRecipeModal(currentItems, async () => {
+    await fetchAndDisplayItems();
+    await fetchAndDisplayRecipes();
+  });
 }
 
 init();

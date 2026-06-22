@@ -15,9 +15,20 @@
                 <div class="items-column">
                     <h2>Available Items</h2>
                     <button id="new-item-btn">Add New Item</button>
+                    <button id="new-recipe-btn">Add New Recipe</button>
                     <button id="clear-grocery-list-btn">Clear Grocery List</button>
                     <div class="items-container">
                         <ul id="items-list" aria-label="Available items">
+                            <li>Loading...</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Right Column: Recipes -->
+                <div class="recipes-column">
+                    <h2>Recipes</h2>
+                    <div class="recipes-container">
+                        <ul id="recipes-list" aria-label="Available recipes">
                             <li>Loading...</li>
                         </ul>
                     </div>
@@ -88,6 +99,39 @@
                     </button>
                     <button id="delete-item-submit-btn" class="btn-danger">
                         Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- New Recipe Modal Background -->
+        <div id="new-recipe-modal-backdrop" class="modal-backdrop hidden">
+            <!-- Modal Content -->
+            <div class="modal">
+                <h2>Create New Recipe</h2>
+                <input type="text" id="recipe-name-input" placeholder="Recipe name..." />
+                <div class="recipe-items-section">
+                    <label for="recipe-item-select">Add Items:</label>
+                    <div class="recipe-item-input-group">
+                        <select id="recipe-item-select">
+                            <option value="" disabled selected>
+                                Select an item...
+                            </option>
+                        </select>
+                        <button id="recipe-add-item-btn" class="btn-secondary">Add</button>
+                    </div>
+                    <button id="recipe-new-item-btn" class="btn-secondary btn-small">
+                        + New Item
+                    </button>
+                    <ul id="recipe-items-list" aria-label="Recipe items">
+                    </ul>
+                </div>
+                <div class="modal-actions">
+                    <button id="new-recipe-cancel-btn" class="btn-secondary">
+                        Cancel
+                    </button>
+                    <button id="new-recipe-submit-btn" class="btn-primary">
+                        Create Recipe
                     </button>
                 </div>
             </div>

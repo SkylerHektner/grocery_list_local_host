@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs;
 use crate::grocery_list::delete_from_grocery_list_str;
+use crate::utils::format_name;
 
 const ITEMS_FILE_PATH: &str = "data/items.ron";
 
@@ -47,29 +48,6 @@ pub struct Item {
     pub category: Category,
 }
 
-fn format_item_name(name: &str) -> String {
-    let mut cleaned = String::new();
-    for c in name.chars() {
-        if c == '_' || c == '-' || c == '.' {
-            cleaned.push(' ');
-        } else if c.is_alphanumeric() || c == ' ' {
-            cleaned.push(c);
-        }
-    }
-
-    cleaned
-        .split_whitespace()
-        .map(|word| {
-            let mut c = word.chars();
-            match c.next() {
-                None => String::new(),
-                Some(f) => f.to_uppercase().collect::<String>() + &c.as_str().to_lowercase(),
-            }
-        })
-        .collect::<Vec<String>>()
-        .join(" ")
-}
-
 pub async fn get_items() -> Json<Vec<Item>> {
     let items: Vec<Item> = if Path::new(ITEMS_FILE_PATH).exists() {
         let content = fs::read_to_string(ITEMS_FILE_PATH)
@@ -91,7 +69,7 @@ pub async fn update_item(
     AxumPath(old_name): AxumPath<String>,
     Json(payload): Json<Item>,
 ) -> (StatusCode, String) {
-    let formatted_name = format_item_name(&payload.name);
+    let formatted_name = format_name(&payload.name);
 
     let mut items: Vec<Item> = if Path::new(ITEMS_FILE_PATH).exists() {
         let content = fs::read_to_string(ITEMS_FILE_PATH)
@@ -169,7 +147,7 @@ pub async fn delete_item(AxumPath(name): AxumPath<String>) -> (StatusCode, Strin
 }
 
 pub async fn add_item(Json(payload): Json<Item>) -> (StatusCode, String) {
-    let formatted_name = format_item_name(&payload.name);
+    let formatted_name = format_name(&payload.name);
 
     // 1. Read the existing items from the file (if it exists)
     let mut items: Vec<Item> = if Path::new(ITEMS_FILE_PATH).exists() {
