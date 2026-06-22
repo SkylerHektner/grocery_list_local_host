@@ -65,21 +65,25 @@ pub async fn add_to_grocery_list(Json(payload): Json<GroceryListPayload>) -> (St
 pub async fn delete_from_grocery_list(
     Json(payload): Json<GroceryListPayload>,
 ) -> (StatusCode, String) {
+    delete_from_grocery_list_str(&payload.name).await
+}
+
+pub async fn delete_from_grocery_list_str(name: &str) -> (StatusCode, String) {
     let mut items = load_grocery_list().await;
     let original_len = items.len();
 
-    items.retain(|item| !item.eq_ignore_ascii_case(&payload.name));
+    items.retain(|item| !item.eq_ignore_ascii_case(name));
 
     if items.len() == original_len {
         (
             StatusCode::NOT_FOUND,
-            format!("Item '{}' not found in grocery list.", payload.name),
+            format!("Item '{}' not found in grocery list.", name),
         )
     } else {
         save_grocery_list(&items).await;
         (
             StatusCode::OK,
-            format!("Successfully removed {} from grocery list!", payload.name),
+            format!("Successfully removed {} from grocery list!", name),
         )
     }
 }

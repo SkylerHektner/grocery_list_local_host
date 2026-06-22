@@ -83,6 +83,10 @@ button:hover {
     border: 1px solid #e9ecef;
     color: #444;
 }
+#items-list li.in-grocery-list {
+    background-color: #a0ecb2;
+    border-color: #94e3a6;
+}
 #items-list li.empty-message {
     text-align: center;
     background: none;
@@ -101,6 +105,12 @@ button:hover {
     text-transform: uppercase;
     letter-spacing: 0.05em;
     box-shadow: none;
+}
+.unselectable {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
 .category-tag {
     font-size: 0.75rem;

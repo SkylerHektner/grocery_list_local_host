@@ -26,6 +26,9 @@ const deleteItemNameDisplay = document.getElementById(
   "delete-item-name-display",
 );
 
+// grocery list
+const clearGroceryListBtn = document.getElementById("clear-grocery-list-btn");
+
 export let currentItems = [];
 let editItemTargetName = "";
 let deleteItemTargetName = "";
@@ -67,8 +70,10 @@ export async function fetchAndPopulateCategories() {
 export async function fetchAndDisplayItems() {
   try {
     const response = await fetch("/api/items");
-    if (response.ok) {
+    const groceryResponse = await fetch("/api/grocery_list");
+    if (response.ok && groceryResponse.ok) {
       const items = await response.json();
+      const groceryItems = await groceryResponse.json();
       currentItems = items; // Store for duplicate checking
       itemsList.innerHTML = ""; // Clear current list
 
@@ -110,6 +115,15 @@ export async function fetchAndDisplayItems() {
         li.style.alignItems = "center";
         li.tabIndex = -1;
         li.dataset.itemName = item.name;
+        li.dataset.inGroceryList = groceryItems.some(
+          (groceryItem) =>
+            groceryItem.toLowerCase() === item.name.toLowerCase(),
+        )
+          ? "true"
+          : "false";
+        if (li.dataset.inGroceryList === "true") {
+          li.classList.add("in-grocery-list");
+        }
 
         li.addEventListener("keydown", (e) => {
           if (e.key === "ArrowUp") {
@@ -126,20 +140,27 @@ export async function fetchAndDisplayItems() {
             return;
           }
 
-          if (e.key === "ArrowRight" || e.key === "Enter") {
+          if (e.key === "Enter") {
+            li.click();
             e.preventDefault();
-            emitGroceryListEvent("add-item-to-grocery-list", item.name);
-            return;
           }
+        });
 
-          if (e.key === "ArrowLeft") {
-            e.preventDefault();
+        li.addEventListener("click", () => {
+          if (li.dataset.inGroceryList === "true") {
+            console.log("Removing from grocery list:", item.name);
+            resetTypeaheadBuffer();
             emitGroceryListEvent("remove-item-from-grocery-list", item.name);
+          } else {
+            console.log("Adding to grocery list:", item.name);
+            resetTypeaheadBuffer();
+            emitGroceryListEvent("add-item-to-grocery-list", item.name);
           }
         });
 
         const nameSpan = document.createElement("span");
         nameSpan.textContent = item.name;
+        nameSpan.classList.add("unselectable");
 
         const infoDiv = document.createElement("div");
         infoDiv.style.display = "flex";
@@ -154,7 +175,8 @@ export async function fetchAndDisplayItems() {
         editBtn.className = "icon-btn";
         editBtn.textContent = "✏️";
         editBtn.title = "Edit Item";
-        editBtn.addEventListener("click", () => {
+        editBtn.addEventListener("click", (event) => {
+          event.stopPropagation(); // Prevent triggering the add/remove grocery list action
           editItemTargetName = item.name;
           editItemInput.value = item.name;
           editItemCategory.value = item.category;
@@ -166,7 +188,8 @@ export async function fetchAndDisplayItems() {
         deleteBtn.className = "icon-btn";
         deleteBtn.textContent = "🗑️";
         deleteBtn.title = "Delete Item";
-        deleteBtn.addEventListener("click", () => {
+        deleteBtn.addEventListener("click", (event) => {
+          event.stopPropagation(); // Prevent triggering the add/remove grocery list action
           deleteItemTargetName = item.name;
           deleteItemNameDisplay.textContent = item.name;
           deleteItemModalBackdrop.classList.remove("hidden");
@@ -475,3 +498,81 @@ function handleGlobalItemTypeahead(event) {
 }
 
 document.addEventListener("keydown", handleGlobalItemTypeahead);
+
+// Grocery List Events from Items List
+
+async function addToGroceryList(name) {
+  try {
+    const response = await fetch("/api/grocery_list", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name }),
+    });
+
+    if (response.ok) {
+      await fetchAndDisplayItems();
+    } else if (response.status === 409) {
+      // Ignore conflict silently or show a small toast, but simple alert for now
+      console.log(`Item "${name}" already in grocery list`);
+    } else {
+      alert("Failed to add to grocery list.");
+    }
+  } catch (error) {
+    console.error("Error:", error);
+  }
+}
+
+async function removeFromGroceryList(name) {
+  try {
+    const response = await fetch("/api/grocery_list/delete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name }),
+    });
+
+    if (response.ok) {
+      await fetchAndDisplayItems();
+    } else if (response.status === 404) {
+      console.log(`Item "${name}" was not found in the grocery list`);
+    } else {
+      alert("Failed to remove item from grocery list.");
+    }
+  } catch (error) {
+    console.error("Error removing grocery list item:", error);
+  }
+}
+
+document.addEventListener("add-item-to-grocery-list", async (event) => {
+  const itemName = event.detail?.name;
+  if (itemName) {
+    await addToGroceryList(itemName);
+  }
+});
+
+document.addEventListener("remove-item-from-grocery-list", async (event) => {
+  const itemName = event.detail?.name;
+  if (itemName) {
+    await removeFromGroceryList(itemName);
+  }
+});
+
+clearGroceryListBtn.addEventListener("click", async () => {
+  if (confirm("Are you sure you want to clear your entire grocery list?")) {
+    try {
+      const response = await fetch("/api/grocery_list", {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        await fetchAndDisplayItems();
+      } else {
+        alert("Failed to clear grocery list");
+      }
+    } catch (error) {
+      console.error("Error clearing grocery list:", error);
+    }
+  }
+});

@@ -2,6 +2,7 @@ use axum::{Json, extract::Path as AxumPath, http::StatusCode};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs;
+use crate::grocery_list::delete_from_grocery_list_str;
 
 const ITEMS_FILE_PATH: &str = "data/items.ron";
 
@@ -150,6 +151,9 @@ pub async fn delete_item(AxumPath(name): AxumPath<String>) -> (StatusCode, Strin
     items.retain(|i| !i.name.eq_ignore_ascii_case(&name));
 
     if items.len() < initial_len {
+
+        delete_from_grocery_list_str(&name).await;
+
         let pretty_config = ron::ser::PrettyConfig::default();
         let ron_string =
             ron::ser::to_string_pretty(&items, pretty_config).expect("Failed to serialize to RON");
