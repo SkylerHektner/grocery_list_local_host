@@ -10,7 +10,7 @@ type Snapshot = {
   version: number;
   categories: { id: number; name: string }[];
   items: Item[];
-  recipes: { id: number; name: string; item_ids: number[] }[];
+  recipes: { id: number; name: string; ingredients: { item_id: number; note: string | null }[] }[];
   list: { entries: { item_id: number; note: string | null }[]; recipe_ids: number[] };
 };
 
@@ -47,7 +47,7 @@ async function createItem(request: APIRequestContext, data: Partial<Item> & { na
 }
 
 async function createRecipe(request: APIRequestContext, name: string, itemIds: number[]) {
-  const res = await request.post('/api/recipes', { data: { name, item_ids: itemIds } });
+  const res = await request.post('/api/recipes', { data: { name, ingredients: itemIds.map((item_id) => ({ item_id })) } });
   expect(res.ok()).toBeTruthy();
   return (await res.json()).id as number;
 }
@@ -261,7 +261,7 @@ test('delete an item: the confirm names its recipes; it leaves them and the list
   await expect(row).toHaveCount(0);
   const s = await state(request);
   expect(s.items.some((i) => i.id === id)).toBe(false);
-  expect(s.recipes.find((r) => r.id === recipeId)?.item_ids).toEqual([milk]);
+  expect(s.recipes.find((r) => r.id === recipeId)?.ingredients.map((i) => i.item_id)).toEqual([milk]);
   expect(s.list.entries.some((e) => e.item_id === id)).toBe(false);
 
   // The recipe editor shows what is left.
@@ -321,7 +321,7 @@ test('merge an item into another: its name becomes an alias; recipe and list ref
   const item = s.items.find((i) => i.id === intoId)!;
   expect(item.aliases).toEqual([from]);
   expect(item.category_id).toBe(pantry);
-  expect(s.recipes.find((r) => r.id === recipeId)?.item_ids).toEqual([intoId, milk]);
+  expect(s.recipes.find((r) => r.id === recipeId)?.ingredients.map((i) => i.item_id)).toEqual([intoId, milk]);
   expect(s.list.entries.map((e) => [e.item_id, e.note])).toEqual([[intoId, '2 jars']]);
 });
 

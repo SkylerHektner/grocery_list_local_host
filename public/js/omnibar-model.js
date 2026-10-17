@@ -29,7 +29,7 @@ export function parseEntry(raw) {
   return { query: collapse(text.slice(0, comma)), note: collapse(text.slice(comma + 1)) || null };
 }
 
-const isRecipe = (c) => Array.isArray(c.item_ids);
+const isRecipe = (c) => Array.isArray(c.ingredients);
 
 /** True when `query` equals (normalized) the item's name or one of its aliases. */
 function exactlyNames(item, norm) {

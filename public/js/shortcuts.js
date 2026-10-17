@@ -86,6 +86,7 @@ export const SHORTCUT_GROUPS = [
       { keys: ['↓'], label: 'From the empty search: move into the ingredients' },
       { keys: ['↑', '↓', 'j', 'k'], label: 'Move between ingredients (↑ on the first: back to the search)' },
       { keys: ['Home', 'End'], label: 'First / last ingredient' },
+      { keys: ['Enter', 'n'], label: "Edit the ingredient's note for the list (Enter saves, Esc cancels)" },
       { keys: ['Delete', 'Backspace', 'x'], label: 'Remove the ingredient' },
       { keys: ['/', 'Esc'], label: 'Back to the search' },
       { keys: ['Esc'], label: 'From the empty search: back to the recipes (or the list)' },

@@ -1936,9 +1936,6 @@ code {
   gap: var(--space-2);
 }
 
-.ingredient-row .row-main {
-  cursor: default;
-}
 
 /* ── Cull dialog (components/cull-dialog.js) ────────────────────────────────────────────── */
 
@@ -2022,8 +2019,16 @@ code {
   outline-offset: 1px;
 }
 
-.cull-name {
+.cull-text {
+  display: flex;
   flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
+  min-width: 0;
+}
+
+.cull-name {
   min-width: 0;
   overflow-wrap: anywhere;
   transition: color var(--dur) var(--ease);

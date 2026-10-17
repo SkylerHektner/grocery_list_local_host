@@ -32,7 +32,7 @@ and say which in the commit message. Task breakdown and status live in [TASKS.md
 |---|---|
 | **Category** | A store section ("Produce", "Dairy & Eggs"). The array order of categories *is* the store walk order. |
 | **Item** | A catalog entry: `name`, optional `category_id` (null = Uncategorized), `aliases` (alternate search names), `staple` flag ("usually have it"), usage stats for search ranking. |
-| **Recipe** | A named set of items (`item_ids`). No quantities. "Weekly staples" can simply be a recipe. |
+| **Recipe** | A named, ordered set of items (`ingredients`), each with an optional note ("1 lb") that its list entry gets when the recipe adds it. No quantities. "Weekly staples" can simply be a recipe. |
 | **List** | The single active grocery list: entries (item + optional note + sources) and the set of recipes that have been added to it. |
 | **Source** | Why an entry is on the list: `manual` and/or one or more `recipe` ids. |
 
@@ -77,7 +77,10 @@ and say which in the commit message. Task breakdown and status live in [TASKS.md
     "aliases": ["Parmesan"], "staple": false,
     "use_count": 4, "last_used": 1760650000
   }],
-  "recipes": [{ "id": 20, "name": "Tacos", "item_ids": [10, 11] }],
+  "recipes": [{
+    "id": 20, "name": "Tacos",
+    "ingredients": [{ "item_id": 10, "note": "1 wedge" }, { "item_id": 11, "note": null }]
+  }],
   "list": {
     "entries": [{
       "item_id": 10, "note": "2 wedges",
@@ -90,7 +93,9 @@ and say which in the commit message. Task breakdown and status live in [TASKS.md
 ```
 
 Timestamps are unix seconds (no date-time crate needed); `last_used` is 0 for never-used items.
-A missing note is `null`. IDs come from one shared `next_id` counter.
+A missing note is `null` (list entries and recipe ingredients alike). IDs come from one shared
+`next_id` counter. Recipes stored as `item_ids` (before ingredient notes) load with no
+ingredients; there is no migration.
 
 ### 2.3 Names & validation
 
@@ -102,8 +107,8 @@ A missing note is `null`. IDs come from one shared `next_id` counter.
   category names unique (all case-insensitive).
 - Aliases: blank ones are dropped, as are case-insensitive duplicates and aliases equal to the
   item's own name.
-- Notes: trimmed and internal whitespace collapsed (a note never spans lines in the export), max
-  80 chars, no control characters, empty ⇒ no note.
+- Notes (list entries and recipe ingredients): trimmed and internal whitespace collapsed (a note
+  never spans lines in the export), max 80 chars, no control characters, empty ⇒ no note.
 
 ---
 
@@ -205,6 +210,10 @@ name, with category headers):
 - Keyboard: `↑`/`↓` (`j`/`k`, `Home`/`End`) move, `Space` toggles, `a` toggles all (a "Check
   all / Uncheck all" button does the same for touch), `Enter` confirms, `Esc` cancels. Focus is
   trapped in the dialog and returns afterwards to where it was (the omnibar, the recipe row).
+- Each row shows the recipe's note for that ingredient, read-only ("Ground beef — 1 lb").
+- **Recipe notes:** a new entry gets the ingredient's note; an entry already on the list gets it
+  only if it has no note (an existing note is never replaced, so a second recipe fills a note
+  only when the first gave none).
 - The dialog shows a live "Adding N of M" count; skipped rows are struck through.
 - Live sync while it is open keeps the user's choices (new ingredients get the defaults); if the
   recipe is deleted meanwhile the dialog closes with a toast.
@@ -223,9 +232,12 @@ name, with category headers):
   on a phone instead of squeezing it; a very long recipe name is shortened with "…".
 - "Recipes on this list" chips at the top; removing a chip removes the recipe source from all
   entries and removes entries left with no source (items also added manually or by another
-  recipe stay). Removing an entry removes it whatever its sources; chips stay even when no entry
-  from that recipe is left (only removing the chip, clearing, or deleting the recipe drops it).
-  Editing a recipe's ingredients doesn't change the list.
+  recipe stay). An entry that stays and still has exactly the note that recipe gave it loses the
+  note (or takes the note of its first remaining recipe source that has one); a note the user
+  changed is kept. Deleting the recipe itself leaves notes alone. Removing an entry removes it
+  whatever its sources; chips stay even when no entry from that recipe is left (only removing the
+  chip, clearing, or deleting the recipe drops it). Editing a recipe's ingredients or their notes
+  doesn't change the list.
 - **Layout:** each category's entries are a grid of tiles in reading order (as many columns as
   fit, at least 190 px wide; one column on a phone); a tile with its note editor open spans the line.
 - **Keyboard list navigation:** `↓` from an empty omnibar moves focus into the list; `↑`/`↓` move a
@@ -309,14 +321,18 @@ brings the recipe in, e.g. one just created on another device).
 - Ingredients are added with the same omnibar as the List view (items only: no recipes, no
   create-recipe row), including inline item creation with the category picker; the created item
   joins the recipe. Items already in the recipe are badged "in recipe" in the dropdown; picking
-  one again only says "Milk is already in Tacos". Focus stays in the omnibar for rapid entry, and
+  one again only says "Milk is already in Tacos" (with an inline note, `milk, 2%`, it updates the
+  ingredient's note instead). The inline note syntax gives a new ingredient its note
+  (`ground beef, 1 lb`). Focus stays in the omnibar for rapid entry, and
   adds run one at a time through a queue, each reading the latest recipe, so fast typing never
   drops an ingredient.
 - Ingredient rows are grouped and ordered like the list (walk order, then name; staples tagged)
-  with an always-visible remove button. Keyboard: `↓` from the empty omnibar moves into the rows;
-  `↑`/`↓`/`j`/`k`/`Home`/`End` move; `Delete`/`Backspace`/`x` removes (focus moves to the next
-  row, else the previous, else the omnibar); `/` or `Esc` go back to the omnibar. A removal toast
-  offers Undo (the ingredient goes back where it was).
+  with the ingredient's note and an always-visible remove button. The note is edited inline like
+  a list note: click/tap the row, the pencil button, or `Enter`/`n` on a focused row (`Enter`
+  saves, `Esc` cancels, an empty note clears it). Keyboard: `↓` from the empty omnibar moves into
+  the rows; `↑`/`↓`/`j`/`k`/`Home`/`End` move; `Delete`/`Backspace`/`x` removes (focus moves to
+  the next row, else the previous, else the omnibar); `/` or `Esc` go back to the omnibar. A
+  removal toast offers Undo (the ingredient goes back where it was, with its note).
 - "Add to list" opens the cull dialog (a recipe without ingredients just says to add some
   first); "Delete" asks for confirmation (the recipe comes off the list; its items stay there as
   manual entries — see §4), then returns to the index.
@@ -453,8 +469,8 @@ follow-up fetch. `Snapshot` = `{version, categories, items, recipes, list}`.
 | `PUT /api/items/{id}` | `{name, category_id, aliases, staple}` | full replace of editable fields; all required |
 | `DELETE /api/items/{id}` | | cascades out of recipes + list; clears list undo history |
 | `POST /api/items/{id}/merge` | `{into_id}` | P2; see 3.8; 400 into itself; clears list undo history |
-| `POST /api/recipes` | `{name, item_ids?}` | 400 unknown item; duplicates dropped |
-| `PUT /api/recipes/{id}` | `{name, item_ids}` | list untouched |
+| `POST /api/recipes` | `{name, ingredients?: [{item_id, note?}]}` | 400 unknown item or invalid note; duplicate items dropped (first wins) |
+| `PUT /api/recipes/{id}` | `{name, ingredients}` | full replace incl. notes; list untouched |
 | `DELETE /api/recipes/{id}` | | removes recipe sources from list entries; entries left sourceless become manual; clears list undo history |
 | `POST /api/list/items` | `{item_id, note?}` | adds manual source; bumps usage (see 3.1); 404 unknown item |
 | `PUT /api/list/items/{item_id}` | `{note}` | `null`/`""` clears; 404 if not on list |

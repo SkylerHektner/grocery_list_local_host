@@ -67,7 +67,13 @@ What `GET /api/state` returns and what `state` holds in mutation responses. The 
     }
   ],
   "recipes": [
-    { "id": 56, "name": "Spaghetti Carbonara", "item_ids": [42, 30, 31, 26, 17, 41, 40] }
+    {
+      "id": 56, "name": "Spaghetti Carbonara",
+      "ingredients": [
+        { "item_id": 42, "note": null }, { "item_id": 30, "note": null },
+        { "item_id": 31, "note": "4 yolks + 1 whole" }, { "item_id": 26, "note": null }
+      ]
+    }
   ],
   "list": {
     "entries": [
@@ -202,7 +208,7 @@ PUT /api/items/32 {"name": "Whole milk", "category_id": 5, "aliases": ["Milk"], 
 
 ### `DELETE /api/items/{id}`
 
-Deletes the item and every reference to it: removed from every recipe's `item_ids` and from the
+Deletes the item and every reference to it: removed from every recipe's `ingredients` and from the
 list (recipe chips stay, even if no entry from that recipe is left). **Clears the list-undo
 history** (older list states would reference the item). → `id` = the deleted id.
 Errors: 404 unknown id.
@@ -239,23 +245,31 @@ Logic: `src/catalog.rs`.
 
 ### `POST /api/recipes`
 
-Body `{name, item_ids?}` (default `[]`). `item_ids` must all be existing items; duplicates are
-dropped (first occurrence wins). Creating does not touch the list. → `id` = the new recipe.
-Errors: 400 invalid name or unknown item (`"item 999 does not exist"`), 409 duplicate name.
+Body `{name, ingredients?}` (default `[]`), each ingredient `{item_id, note?}`. Every `item_id`
+must be an existing item; duplicate items are dropped (first occurrence wins, note included).
+A note is normalized like a list note (absent, `null` or blank = no note); it is what the item's
+list entry gets when the recipe adds it (see `POST /api/list/recipes`). Creating does not touch
+the list. → `id` = the new recipe.
+Errors: 400 invalid name, unknown item (`"item 999 does not exist"`) or invalid note
+(`"note is too long (81 characters, max 80)"`), 409 duplicate name.
 
 ```
-POST /api/recipes {"name": "pancakes", "item_ids": [32, 31, 32]}
-→ 200 {"state": {…, "recipes": [… , {"id": 122, "name": "Pancakes", "item_ids": [32, 31]}]}, "id": 122}
+POST /api/recipes {"name": "pancakes", "ingredients": [
+  {"item_id": 32, "note": " 1  cup "}, {"item_id": 31}, {"item_id": 32}]}
+→ 200 {"state": {…, "recipes": [… , {"id": 122, "name": "Pancakes", "ingredients": [
+       {"item_id": 32, "note": "1 cup"}, {"item_id": 31, "note": null}]}]}, "id": 122}
 ```
 
 ### `PUT /api/recipes/{id}`
 
-Body `{name, item_ids}` (both required): full replace. The list is **not** changed: entries keep
-this recipe as a source even if their item is no longer an ingredient. → `id` = `{id}`.
+Body `{name, ingredients}` (both required): full replace, notes included (an ingredient sent
+without a note has none). The list is **not** changed: entries keep this recipe as a source (and
+any note it gave them) even if their item is no longer an ingredient. → `id` = `{id}`.
 Errors: 404 unknown id, 400 / 409 as for POST.
 
 ```
-PUT /api/recipes/55 {"name": "Taco night", "item_ids": [28, 25, 15]}
+PUT /api/recipes/55 {"name": "Taco night", "ingredients": [
+  {"item_id": 28, "note": "1 lb"}, {"item_id": 25}, {"item_id": 15, "note": null}]}
 → 200 {"state": {…}, "id": 55}
 ```
 
@@ -325,8 +339,9 @@ DELETE /api/list/items/31
 
 Body `{recipe_id, item_ids}` (both required): `item_ids` is the culled subset of the recipe's
 ingredients the user kept (duplicates ignored). Each gets a `{"kind": "recipe", "recipe_id": …}`
-source: items already on the list just gain the source (never duplicated, note kept), others get
-a new entry (no note), in the recipe's ingredient order. The recipe is added to
+source: items already on the list just gain the source (never duplicated), others get a new
+entry, in the recipe's ingredient order. **Notes:** an entry without a note gets the
+ingredient's note; an existing note is never replaced. The recipe is added to
 `list.recipe_ids` (once) **even when `item_ids` is empty**, so its chip shows. Adding the same
 recipe again extends it. → `id` = `recipe_id`.
 Errors: 404 unknown recipe, 400 an id that is not an ingredient of the recipe
@@ -334,7 +349,7 @@ Errors: 404 unknown recipe, 400 an id that is not an ingredient of the recipe
 
 ```
 POST /api/list/recipes {"recipe_id": 55, "item_ids": [28, 15]}
-→ 200 {"state": {…, "list": {"entries": [{"item_id": 28, "note": null,
+→ 200 {"state": {…, "list": {"entries": [{"item_id": 28, "note": "1 lb",
        "sources": [{"kind": "recipe", "recipe_id": 55}], "added_at": 1760650000}, …],
        "recipe_ids": [55]}}, "id": 55}
 ```
@@ -342,7 +357,9 @@ POST /api/list/recipes {"recipe_id": 55, "item_ids": [28, 15]}
 ### `DELETE /api/list/recipes/{recipe_id}`
 
 Removes the chip and the recipe's source from every entry; entries left without a source leave
-the list (items also added manually or by another recipe stay). The recipe itself is not
+the list (items also added manually or by another recipe stay). A staying entry whose note is
+still exactly this recipe's note for its item loses it, or takes the note of its first remaining
+recipe source that has one (a note the user changed is kept). The recipe itself is not
 deleted. → `id` = `{recipe_id}`.
 Errors: 404 unknown recipe or not on the list (`"\"Tacos\" is not on the list"`).
 

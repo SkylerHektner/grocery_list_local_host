@@ -8,7 +8,7 @@ type Snapshot = {
   version: number;
   categories: { id: number; name: string }[];
   items: { id: number; name: string; category_id: number | null; staple: boolean }[];
-  recipes: { id: number; name: string; item_ids: number[] }[];
+  recipes: { id: number; name: string; ingredients: { item_id: number; note: string | null }[] }[];
   list: { entries: { item_id: number; note: string | null }[]; recipe_ids: number[] };
 };
 
@@ -374,26 +374,26 @@ test('removing a recipe chip keeps manually added items; Undo brings it back', a
   await resetList(request);
   await addViaApi(request, 'Milk');
   const recipe = (await state(request)).recipes.find((r) => r.name === 'Weekly Staples')!;
-  const res = await request.post('/api/list/recipes', { data: { recipe_id: recipe.id, item_ids: recipe.item_ids } });
+  const res = await request.post('/api/list/recipes', { data: { recipe_id: recipe.id, item_ids: recipe.ingredients.map((i) => i.item_id) } });
   expect(res.ok()).toBeTruthy();
   await open(page);
 
   const chip = page.getByTestId('recipe-chip').filter({ hasText: 'Weekly Staples' });
   await expect(chip).toBeVisible();
-  await expect(page.getByTestId('list-row')).toHaveCount(recipe.item_ids.length);
+  await expect(page.getByTestId('list-row')).toHaveCount(recipe.ingredients.length);
   await expect(row(page, 'Milk').getByTestId('row-source')).toHaveText(['Weekly Staples']);
-  await expect(page.getByTestId('list-summary')).toHaveText(`${recipe.item_ids.length} items · 1 recipe`);
+  await expect(page.getByTestId('list-summary')).toHaveText(`${recipe.ingredients.length} items · 1 recipe`);
 
   await chip.getByTestId('recipe-chip-remove').click();
   await expect(page.getByTestId('recipe-chip')).toHaveCount(0);
   await expect(page.getByTestId('row-name')).toHaveText(['Milk']);
   await expect(row(page, 'Milk').getByTestId('row-source')).toHaveCount(0);
-  const removed = toast(page, `Removed Weekly Staples and ${recipe.item_ids.length - 1} items`);
+  const removed = toast(page, `Removed Weekly Staples and ${recipe.ingredients.length - 1} items`);
   await expect(removed).toBeVisible();
 
   await removed.getByTestId('toast-action').click();
   await expect(chip).toBeVisible();
-  await expect(page.getByTestId('list-row')).toHaveCount(recipe.item_ids.length);
+  await expect(page.getByTestId('list-row')).toHaveCount(recipe.ingredients.length);
 });
 
 test('clear list asks first; cancel keeps it, confirm empties it (with Undo)', async ({ page, request }) => {

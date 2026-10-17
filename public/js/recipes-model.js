@@ -2,7 +2,10 @@
 // ingredient edits the editor sends. Pure; no DOM. Works on the derived state from store.js.
 //
 //   filterRecipes('tac', state.recipes)   // -> {query, results: [{recipe, text, ranges}], createName}
-//   ingredientGroups(recipe, state)       // -> [{key, name, rows: [{item, staple, onList}]}]
+//   ingredientGroups(recipe, state)       // -> [{key, name, rows: [{item, note, staple, onList}]}]
+//
+// A recipe's `ingredients` are `[{item_id, note}]` in recipe order; the edit helpers return the
+// new array to send as `ingredients` (notes travel with their items).
 
 import { normalize, search } from './fuzzy.js';
 import { compareNames, plural } from './list-model.js';
@@ -41,6 +44,7 @@ export function filterRecipes(query, recipes) {
 /**
  * @typedef {object} IngredientRow
  * @property {object} item
+ * @property {string|null} note  the note the recipe gives the item's list entry
  * @property {boolean} staple   the item is a staple ("usually have it")
  * @property {boolean} onList   the item is on the list already
  */
@@ -56,18 +60,25 @@ export function filterRecipes(query, recipes) {
 /**
  * A recipe's ingredients the way the list shows items: grouped by category in walk order,
  * Uncategorized last, sorted by name inside a group. Unknown item ids are skipped.
- * @param {{item_ids: number[]}} recipe
+ * @param {{ingredients: Array<{item_id: number, note: string|null}>}} recipe
  * @param {object} state  derived store state
+ * @param {{hidden?: Set<number>, notes?: Map<number, string|null>}} [overrides]
+ *   pending local edits: ingredients to leave out, notes to show instead of the recipe's
  * @returns {IngredientGroup[]}
  */
-export function ingredientGroups(recipe, state) {
+export function ingredientGroups(recipe, state, { hidden, notes } = {}) {
   const byCategory = new Map();
-  for (const id of recipe.item_ids) {
+  for (const { item_id: id, note } of recipe.ingredients) {
     const item = state.itemsById.get(id);
-    if (!item) continue;
+    if (!item || hidden?.has(id)) continue;
     const categoryId = state.categoriesById.has(item.category_id) ? item.category_id : null;
     if (!byCategory.has(categoryId)) byCategory.set(categoryId, []);
-    byCategory.get(categoryId).push({ item, staple: !!item.staple, onList: state.entriesByItemId.has(id) });
+    byCategory.get(categoryId).push({
+      item,
+      note: (notes?.has(id) ? notes.get(id) : note) ?? null,
+      staple: !!item.staple,
+      onList: state.entriesByItemId.has(id),
+    });
   }
   const groups = [];
   const push = (category, rows) => {
@@ -92,48 +103,81 @@ export function ingredientOrder(groups) {
   return groups.flatMap((g) => g.rows.map((r) => r.item.id));
 }
 
+/** The recipe's ingredient item ids, in recipe order. */
+export function ingredientIds(recipe) {
+  return recipe.ingredients.map((i) => i.item_id);
+}
+
+/** Whether `itemId` is an ingredient of `recipe`. */
+export function hasIngredient(recipe, itemId) {
+  return recipe.ingredients.some((i) => i.item_id === itemId);
+}
+
+/** A note as the server stores it: whitespace collapsed, blank = null. */
+export function normalizeNote(note) {
+  return collapse(note) || null;
+}
+
 /**
- * The recipe's `item_ids` with `itemId` appended, or null when it is already an ingredient.
- * @param {{item_ids: number[]}} recipe
+ * The recipe's ingredients with `itemId` appended (with `note`), or null when it is already an
+ * ingredient.
+ * @param {{ingredients: object[]}} recipe
  * @param {number} itemId
+ * @param {string|null} [note]
  */
-export function withIngredient(recipe, itemId) {
-  return recipe.item_ids.includes(itemId) ? null : [...recipe.item_ids, itemId];
+export function withIngredient(recipe, itemId, note = null) {
+  if (hasIngredient(recipe, itemId)) return null;
+  return [...recipe.ingredients, { item_id: itemId, note: normalizeNote(note) }];
 }
 
-/** The recipe's `item_ids` without `itemId`. */
+/** The recipe's ingredients without `itemId`. */
 export function withoutIngredient(recipe, itemId) {
-  return recipe.item_ids.filter((id) => id !== itemId);
+  return recipe.ingredients.filter((i) => i.item_id !== itemId);
 }
 
 /**
- * Undo of a removal: `itemId` back at `index` (clamped), or null when it is an ingredient again.
- * @param {{item_ids: number[]}} recipe
+ * The recipe's ingredients with `itemId`'s note set to `note` (blank clears it), or null when it
+ * is not an ingredient or already has that note.
+ * @param {{ingredients: object[]}} recipe
  * @param {number} itemId
+ * @param {string|null} note
+ */
+export function withIngredientNote(recipe, itemId, note) {
+  const next = normalizeNote(note);
+  const current = recipe.ingredients.find((i) => i.item_id === itemId);
+  if (!current || (current.note ?? null) === next) return null;
+  return recipe.ingredients.map((i) => (i.item_id === itemId ? { ...i, note: next } : i));
+}
+
+/**
+ * Undo of a removal: the removed `ingredient` (note included) back at `index` (clamped), or
+ * null when its item is an ingredient again.
+ * @param {{ingredients: object[]}} recipe
+ * @param {{item_id: number, note: string|null}} ingredient
  * @param {number} index
  */
-export function restoreIngredient(recipe, itemId, index) {
-  if (recipe.item_ids.includes(itemId)) return null;
-  const ids = [...recipe.item_ids];
-  ids.splice(Math.min(Math.max(index, 0), ids.length), 0, itemId);
-  return ids;
+export function restoreIngredient(recipe, ingredient, index) {
+  if (hasIngredient(recipe, ingredient.item_id)) return null;
+  const next = [...recipe.ingredients];
+  next.splice(Math.min(Math.max(index, 0), next.length), 0, ingredient);
+  return next;
 }
 
 /**
  * Ingredient names in recipe order, for the one-line preview under a recipe in the index.
- * @param {{item_ids: number[]}} recipe
+ * @param {{ingredients: object[]}} recipe
  * @param {object} state
  */
 export function ingredientNames(recipe, state) {
-  return recipe.item_ids
-    .map((id) => state.itemsById.get(id)?.name)
+  return recipe.ingredients
+    .map((i) => state.itemsById.get(i.item_id)?.name)
     .filter(Boolean)
     .join(', ');
 }
 
 /** "11 ingredients" / "1 ingredient" / "No ingredients yet". */
 export function ingredientCount(recipe) {
-  const n = recipe.item_ids.length;
+  const n = recipe.ingredients.length;
   return n ? plural(n, 'ingredient') : 'No ingredients yet';
 }
 

@@ -53,11 +53,11 @@ function endpoints(mutate) {
     deleteItem: (id) => mutate('DELETE', `/api/items/${enc(id)}`),
     mergeItem: (id, intoId) => mutate('POST', `/api/items/${enc(id)}/merge`, { into_id: intoId }),
     // Recipes
-    /** @param {{name: string, item_ids?: number[]}} recipe */
-    createRecipe: (recipe) => mutate('POST', '/api/recipes', pick(recipe, ['name', 'item_ids'])),
-    /** Full replace: name and item_ids are both required. */
+    /** @param {{name: string, ingredients?: Array<{item_id: number, note?: string|null}>}} recipe */
+    createRecipe: (recipe) => mutate('POST', '/api/recipes', pick(recipe, ['name', 'ingredients'])),
+    /** Full replace: name and ingredients (with their notes) are both required. */
     updateRecipe: (id, recipe) =>
-      mutate('PUT', `/api/recipes/${enc(id)}`, pick(recipe, ['name', 'item_ids'])),
+      mutate('PUT', `/api/recipes/${enc(id)}`, pick(recipe, ['name', 'ingredients'])),
     deleteRecipe: (id) => mutate('DELETE', `/api/recipes/${enc(id)}`),
     // List
     /** Adds (or re-adds) with a manual source; a blank/absent note keeps the existing one. */

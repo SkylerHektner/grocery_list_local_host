@@ -254,7 +254,7 @@ describe('search ranking', () => {
   test('limit, custom getters and non-item candidates', () => {
     assert.equal(search('a', CATALOG, { limit: 3 }).length, 3);
     assert.deepEqual(search('a', CATALOG, { limit: 0 }), []);
-    const recipes = [{ id: 1, name: 'Tacos', item_ids: [] }, { id: 2, name: 'Stir Fry', item_ids: [] }];
+    const recipes = [{ id: 1, name: 'Tacos', ingredients: [] }, { id: 2, name: 'Stir Fry', ingredients: [] }];
     assert.deepEqual(names(search('sf', recipes)), ['Stir Fry']);
     const rows = [{ label: 'Dairy & Eggs' }, { label: 'Deli & Cheese' }];
     const byLabel = search('de', rows, { name: (r) => r.label, aliases: () => [] });

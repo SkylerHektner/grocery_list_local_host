@@ -135,7 +135,7 @@ export function searchRow(id, option, state, on) {
           { class: 'option-meta' },
           badge && h('span', { class: 'tag tag-accent', testid: 'option-badge' }, badge),
           h('span', { class: 'tag tag-warm' }, 'Recipe'),
-          h('span', { class: 'option-category' }, plural(recipe.item_ids.length, 'item')),
+          h('span', { class: 'option-category' }, plural(recipe.ingredients.length, 'item')),
         ),
       );
     }

@@ -62,7 +62,7 @@ test.describe('keyboard only', () => {
     expect((await request.delete('/api/list')).ok()).toBeTruthy();
     const recipe = `${uniqueName()} walk`;
     const ingredients = [await itemId(request, 'Milk'), await itemId(request, 'Eggs')];
-    expect((await request.post('/api/recipes', { data: { name: recipe, item_ids: ingredients } })).ok()).toBeTruthy();
+    expect((await request.post('/api/recipes', { data: { name: recipe, ingredients: ingredients.map((item_id) => ({ item_id })) } })).ok()).toBeTruthy();
     const item = `${uniqueName()} walk item`;
     expect((await request.post('/api/items', { data: { name: item } })).ok()).toBeTruthy();
     const category = `${uniqueName()} aisle`;

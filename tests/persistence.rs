@@ -76,7 +76,7 @@ async fn every_mutation_persists_across_a_restart() {
         app,
         Method::POST,
         "/api/recipes",
-        Some(json!({ "name": "Salad", "item_ids": [kale] })),
+        Some(json!({ "name": "Salad", "ingredients": [{ "item_id": kale, "note": "1 bunch" }] })),
     )
     .await;
     let salad = app.recipe_id("Salad");
@@ -85,7 +85,7 @@ async fn every_mutation_persists_across_a_restart() {
         app,
         Method::PUT,
         &salad_uri,
-        Some(json!({ "name": "Kale salad", "item_ids": [kale, lemons] })),
+        Some(json!({ "name": "Kale salad", "ingredients": [{ "item_id": kale }, { "item_id": lemons }] })),
     )
     .await;
 

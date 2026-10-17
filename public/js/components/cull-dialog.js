@@ -91,7 +91,12 @@ export function openCullDialog({ recipe, store }) {
             testid: 'cull-check',
             dataset: { key: `cull-${itemId}`, itemId: String(itemId) },
           }),
-          h('span', { class: 'cull-name', testid: 'cull-name' }, r.item.name),
+          h(
+            'span',
+            { class: 'cull-text' },
+            h('span', { class: 'cull-name', testid: 'cull-name' }, r.item.name),
+            r.note && h('span', { class: 'row-note cull-note', testid: 'cull-note', title: 'Note from the recipe' }, r.note),
+          ),
           h(
             'span',
             { class: 'cull-tags' },

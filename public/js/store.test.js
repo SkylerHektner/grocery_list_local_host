@@ -12,6 +12,8 @@ import {
   walkIndex,
 } from './store.js';
 
+const ings = (...ids) => ids.map((item_id) => ({ item_id, note: null }));
+
 function snapshot(version, extra = {}) {
   return {
     version,
@@ -20,7 +22,7 @@ function snapshot(version, extra = {}) {
       { id: 10, name: 'Milk', category_id: 2, aliases: [], staple: false, use_count: 0, last_used: 0 },
       { id: 11, name: 'Candles', category_id: null, aliases: [], staple: false, use_count: 0, last_used: 0 },
     ],
-    recipes: [{ id: 20, name: 'Pancakes', item_ids: [10] }],
+    recipes: [{ id: 20, name: 'Pancakes', ingredients: ings(10) }],
     list: {
       entries: [{ item_id: 10, note: '2 gallons', sources: [{ kind: 'manual' }], added_at: 1 }],
       recipe_ids: [20],

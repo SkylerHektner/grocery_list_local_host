@@ -78,8 +78,45 @@ pub struct Item {
 pub struct Recipe {
     pub id: Id,
     pub name: String,
+    /// In the recipe's own order; one per item.
     #[serde(default)]
-    pub item_ids: Vec<Id>,
+    pub ingredients: Vec<Ingredient>,
+}
+
+/// An item in a recipe, with the note its list entry gets when the recipe adds it (SPEC §3.4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Ingredient {
+    pub item_id: Id,
+    /// Serialized as `null` when absent.
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+impl Ingredient {
+    /// An ingredient without a note.
+    pub fn new(item_id: Id) -> Self {
+        Self {
+            item_id,
+            note: None,
+        }
+    }
+}
+
+impl Recipe {
+    /// The ingredient item ids, in recipe order.
+    pub fn item_ids(&self) -> Vec<Id> {
+        self.ingredients.iter().map(|i| i.item_id).collect()
+    }
+
+    pub fn has_item(&self, item_id: Id) -> bool {
+        self.ingredients.iter().any(|i| i.item_id == item_id)
+    }
+
+    /// The note this recipe gives `item_id`'s list entry, if any.
+    pub fn note_for(&self, item_id: Id) -> Option<&str> {
+        let ingredient = self.ingredients.iter().find(|i| i.item_id == item_id)?;
+        ingredient.note.as_deref()
+    }
 }
 
 /// The single active grocery list.
@@ -423,13 +460,17 @@ impl Db {
         }
 
         for recipe in &self.recipes {
-            check_refs(
-                &format!("recipe {}", recipe.id),
-                "item",
-                &recipe.item_ids,
-                &item_ids,
-                &mut problems,
-            );
+            let at = format!("recipe {}", recipe.id);
+            check_refs(&at, "item", &recipe.item_ids(), &item_ids, &mut problems);
+            for ingredient in &recipe.ingredients {
+                match names::validate_note(ingredient.note.as_deref()) {
+                    Ok(valid) if valid == ingredient.note => {}
+                    _ => problems.push(format!(
+                        "{at} has an invalid note for item {}",
+                        ingredient.item_id
+                    )),
+                }
+            }
         }
 
         check_refs(
@@ -574,7 +615,9 @@ mod tests {
             "id": 10, "name": "Parmigiano Reggiano", "category_id": 1,
             "aliases": ["Parmesan"], "staple": false, "use_count": 4, "last_used": 1760650000
           }],
-          "recipes": [{ "id": 20, "name": "Tacos", "item_ids": [10] }],
+          "recipes": [{
+            "id": 20, "name": "Tacos", "ingredients": [{ "item_id": 10, "note": "1 lb" }]
+          }],
           "list": {
             "entries": [{
               "item_id": 10, "note": "2 wedges",
@@ -602,6 +645,15 @@ mod tests {
         assert_eq!(entry.note, None);
         // Absent note is written as null.
         assert_eq!(serde_json::to_value(&entry).unwrap()["note"], json!(null));
+        let recipe: Recipe = serde_json::from_value(
+            json!({ "id": 2, "name": "Soup", "ingredients": [{ "item_id": 1 }] }),
+        )
+        .unwrap();
+        assert_eq!(recipe.ingredients, [Ingredient::new(1)]);
+        assert_eq!(
+            serde_json::to_value(&recipe).unwrap()["ingredients"],
+            json!([{ "item_id": 1, "note": null }])
+        );
     }
 
     #[test]
@@ -700,7 +752,7 @@ mod tests {
         db.recipes.push(Recipe {
             id,
             name: "Tacos".into(),
-            item_ids: vec![],
+            ingredients: vec![],
         });
         assert_eq!(
             db.check_recipe_name("TACOS", None).unwrap_err().status(),
@@ -760,7 +812,18 @@ mod tests {
         db.recipes.push(Recipe {
             id: 500,
             name: "Tacos".into(),
-            item_ids: vec![milk, milk, 77],
+            ingredients: vec![
+                Ingredient::new(milk),
+                Ingredient::new(milk),
+                Ingredient {
+                    item_id: 77,
+                    note: Some(
+                        "a
+b"
+                        .into(),
+                    ),
+                },
+            ],
         });
         db.list.entries.push(ListEntry {
             item_id: 88,
@@ -780,6 +843,7 @@ mod tests {
             "recipe id 500 not in 1..next_id (13)",
             "recipe 500 lists item 12 twice",
             "recipe 500 references unknown item 77",
+            "recipe 500 has an invalid note for item 77",
             "list references unknown item 88",
             "list entry for item 88 has duplicate sources",
             "list entry for item 88 has recipe 3 not in list.recipe_ids",

@@ -24,6 +24,7 @@ async fn empty_list_exports_an_empty_body() {
 #[tokio::test]
 async fn groups_in_walk_order_sorted_with_notes_and_other_last() {
     let app = TestApp::demo();
+    // Tacos gives Limes and Ground beef their notes.
     app.add_recipe_to_list("Tacos", &["Taco seasoning", "Limes", "Ground beef"])
         .await;
     for name in ["Milk", "Bananas", "Birthday candles", "BBQ sauce"] {
@@ -44,9 +45,9 @@ async fn groups_in_walk_order_sorted_with_notes_and_other_last() {
 
     assert_eq!(
         app.export().await,
-        "PRODUCE\nBananas\nLimes\n\
+        "PRODUCE\nBananas\nLimes (2)\n\
          \n\
-         MEAT & SEAFOOD\nGround beef\n\
+         MEAT & SEAFOOD\nGround beef (1 lb)\n\
          \n\
          DAIRY & EGGS\nEggs (1 dozen)\nMilk (2 gallons)\n\
          \n\

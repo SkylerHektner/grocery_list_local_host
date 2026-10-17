@@ -9,7 +9,7 @@ type Snapshot = {
   version: number;
   categories: { id: number; name: string }[];
   items: { id: number; name: string; category_id: number | null; staple: boolean }[];
-  recipes: { id: number; name: string; item_ids: number[] }[];
+  recipes: { id: number; name: string; ingredients: { item_id: number; note: string | null }[] }[];
   list: {
     entries: { item_id: number; note: string | null; sources: { kind: string; recipe_id?: number }[] }[];
     recipe_ids: number[];
@@ -36,7 +36,8 @@ async function itemIds(request: APIRequestContext, names: string[]) {
 }
 
 async function createRecipe(request: APIRequestContext, name: string, items: string[]) {
-  const res = await request.post('/api/recipes', { data: { name, item_ids: await itemIds(request, items) } });
+  const ingredients = (await itemIds(request, items)).map((item_id) => ({ item_id }));
+  const res = await request.post('/api/recipes', { data: { name, ingredients } });
   expect(res.ok()).toBeTruthy();
   return (await res.json()).id as number;
 }
@@ -130,7 +131,7 @@ test('create a recipe entirely by keyboard from the List omnibar, then go back',
 
   const s = await state(request);
   const recipe = s.recipes.find((r) => r.name === name)!;
-  const names = recipe.item_ids.map((id) => s.items.find((i) => i.id === id)!.name);
+  const names = recipe.ingredients.map(({ item_id }) => s.items.find((i) => i.id === item_id)!.name);
   expect(names).toEqual(['Milk', 'Bananas', fresh]);
   const created = s.items.find((i) => i.name === fresh)!;
   expect(s.categories.find((c) => c.id === created.category_id)?.name).toBe(category);
@@ -264,6 +265,79 @@ test('removing a recipe chip keeps a manually added item (all through the UI)', 
   expect(s.list.entries[0].sources).toEqual([{ kind: 'manual' }]);
 });
 
+test('ingredient notes: edited in the editor, shown in the cull dialog, fill empty list notes, leave with the chip', async ({
+  page,
+  request,
+}) => {
+  await resetList(request);
+  const name = uniqueName();
+  const id = await createRecipe(request, name, ['Milk', 'Eggs', 'Bananas']);
+  // Milk is on the list without a note, Eggs with one of its own.
+  await addViaApi(request, 'Milk');
+  const [eggs] = await itemIds(request, ['Eggs']);
+  expect((await request.post('/api/list/items', { data: { item_id: eggs, note: '6' } })).ok()).toBeTruthy();
+  await open(page, `#/recipes/${id}`);
+  const ingredient = (n: string) =>
+    page.getByTestId('ingredient-row').filter({ has: page.getByTestId('ingredient-name').getByText(n, { exact: true }) });
+  const noteInput = page.getByTestId('ingredient-note-input');
+
+  // Clicking a row edits its note; Enter saves (normalized) and focuses the row.
+  await ingredient('Milk').getByTestId('ingredient-name').click();
+  await expect(noteInput).toBeFocused();
+  await noteInput.fill('  2   gallons ');
+  await page.keyboard.press('Enter');
+  await expect(ingredient('Milk').getByTestId('ingredient-note')).toHaveText('2 gallons');
+  await expect(ingredient('Milk')).toBeFocused();
+  // Enter on a focused row opens the editor too; Esc cancels.
+  await page.keyboard.press('Enter');
+  await expect(noteInput).toHaveValue('2 gallons');
+  await page.keyboard.press('Escape');
+  await expect(noteInput).toHaveCount(0);
+  await expect(ingredient('Milk')).toBeFocused();
+  await ingredient('Eggs').getByTestId('ingredient-name').click();
+  await noteInput.fill('12');
+  await page.keyboard.press('Enter');
+
+  // "item, note" in the search adds the ingredient with that note.
+  await focus(page, 'recipe-search');
+  await page.keyboard.type('greek yogurt, 2 tubs');
+  await page.keyboard.press('Enter');
+  await expect(ingredient('Greek yogurt').getByTestId('ingredient-note')).toHaveText('2 tubs');
+  await expect
+    .poll(async () => {
+      const s = await state(request);
+      const recipe = s.recipes.find((r) => r.id === id)!;
+      return recipe.ingredients.map((i) => [s.items.find((x) => x.id === i.item_id)!.name, i.note]);
+    })
+    .toEqual([
+      ['Milk', '2 gallons'],
+      ['Eggs', '12'],
+      ['Bananas', null],
+      ['Greek yogurt', '2 tubs'],
+    ]);
+
+  // The cull dialog shows the notes (read-only).
+  await page.getByTestId('recipe-add-to-list').click();
+  const dialog = page.getByTestId('cull-dialog');
+  await expect(cullRow(dialog, 'Milk').getByTestId('cull-note')).toHaveText('2 gallons');
+  await expect(cullRow(dialog, 'Bananas').getByTestId('cull-note')).toHaveCount(0);
+  await page.getByTestId('cull-confirm').click();
+  await expect(dialog).toHaveCount(0);
+
+  // On the list the recipe's notes fill empty notes only.
+  await open(page, '#/list');
+  await expect(listRow(page, 'Milk').getByTestId('row-note')).toHaveText('2 gallons');
+  await expect(listRow(page, 'Greek yogurt').getByTestId('row-note')).toHaveText('2 tubs');
+  await expect(listRow(page, 'Eggs').getByTestId('row-note')).toHaveText('6');
+  await expect(listRow(page, 'Bananas').getByTestId('row-note')).toHaveCount(0);
+
+  // Removing the chip: Milk stays (added manually) without the recipe's note; Eggs keeps its own.
+  await page.getByTestId('recipe-chip').filter({ hasText: name }).getByTestId('recipe-chip-remove').click();
+  await expect(page.getByTestId('row-name')).toHaveText(['Eggs', 'Milk']);
+  await expect(listRow(page, 'Milk').getByTestId('row-note')).toHaveCount(0);
+  await expect(listRow(page, 'Eggs').getByTestId('row-note')).toHaveText('6');
+});
+
 test('recipes index: filter, Enter opens the editor; back, a adds to the list; n and the create row make new ones', async ({
   page,
   request,
@@ -381,7 +455,10 @@ test('editor: rename (live sync keeps the typing), ↓ Delete and Undo, then del
   await nameInput.fill('Half typed');
   const [bananas] = await itemIds(request, ['Bananas']);
   const res = await request.put(`/api/recipes/${id}`, {
-    data: { name: renamed, item_ids: [...(await itemIds(request, ['Milk', 'Eggs'])), bananas] },
+    data: {
+      name: renamed,
+      ingredients: [...(await itemIds(request, ['Milk', 'Eggs'])), bananas].map((item_id) => ({ item_id })),
+    },
   });
   expect(res.ok()).toBeTruthy();
   await expect(page.getByTestId('ingredient-row')).toHaveCount(3, { timeout: 8000 });
@@ -400,7 +477,7 @@ test('editor: rename (live sync keeps the typing), ↓ Delete and Undo, then del
   await expect(page.getByTestId('ingredient-name')).toHaveText(['Eggs', 'Milk']);
   await toast(page, `Removed Bananas from ${renamed}`).getByTestId('toast-action').click();
   await expect(page.getByTestId('ingredient-name')).toHaveText(['Bananas', 'Eggs', 'Milk']);
-  await expect.poll(async () => (await state(request)).recipes.find((r) => r.id === id)?.item_ids.length).toBe(3);
+  await expect.poll(async () => (await state(request)).recipes.find((r) => r.id === id)?.ingredients.length).toBe(3);
   await ingredient('Milk').focus();
   await page.keyboard.press('x');
   await expect(page.getByTestId('ingredient-name')).toHaveText(['Bananas', 'Eggs']);

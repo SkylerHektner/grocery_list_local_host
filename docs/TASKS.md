@@ -284,3 +284,19 @@ preview is gone the List card gets wider, so expect more columns.
 Preview: the panel is gone; `views/list-export.js` is now `createExportCache()` (no DOM), kept so
 Copy still has the text synchronously inside the click; the List view stays `view-wide` (1000 px)
 for the grid (4 columns at 1280 px).
+
+## T10 — Default notes on recipe ingredients
+- [x] Done
+
+Notes: Recipes store `ingredients: [{item_id, note}]` (was `item_ids`); `POST`/`PUT
+/api/recipes` take `ingredients` (`POST /api/list/recipes` still takes the culled `item_ids`).
+No schema bump or migration: an old `item_ids` recipe loads with no ingredients. Rust helpers:
+`Recipe::item_ids()/has_item()/note_for()`, `Ingredient::new()`; JS: `ingredientIds()`,
+`hasIngredient()`, `withIngredientNote()` in `recipes-model.js`. Rules (`src/list.rs`): adding a
+recipe fills only empty entry notes; removing its chip clears a staying entry's note only if it
+still equals that recipe's note (then the first remaining recipe source's note, if any);
+deleting a recipe leaves notes alone; merge keeps B's ingredient note unless B has none. UI: the
+cull dialog shows notes read-only (`cull-note`); the editor's rows edit notes inline like list
+notes (`ingredient-note`, `ingredient-note-input`, Enter/n; DOM in
+`views/recipe-ingredient-view.js`); `beef, 1 lb` in the editor's omnibar sets the note. Demo:
+Tacos gives Ground beef "1 lb" and Limes "2", Carbonara gives Eggs "4 yolks + 1 whole".

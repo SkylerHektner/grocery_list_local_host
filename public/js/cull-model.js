@@ -6,16 +6,18 @@
 //   let checked = defaultChecked(groups);                // all but staples (unless on the list)
 //   countLabel(checked.size, ingredientOrder(groups).length)   // "Adding 9 of 11"
 //   api.addRecipeToList(recipe.id, chosenIds(recipe, checked))
+//
+// Rows show the recipe's note for an ingredient (read-only; it fills an empty list note).
 
-import { ingredientGroups, ingredientOrder } from './recipes-model.js';
+import { ingredientGroups, ingredientIds, ingredientOrder } from './recipes-model.js';
 import { plural } from './list-model.js';
 
 export { ingredientOrder };
 
 /**
  * The dialog's rows: the recipe's ingredients grouped by category in walk order, sorted by name
- * (see ingredientGroups()), each with its `staple` and `onList` tags.
- * @param {{item_ids: number[]}} recipe
+ * (see ingredientGroups()), each with its `note` and its `staple` and `onList` tags.
+ * @param {{ingredients: object[]}} recipe
  * @param {object} state  derived store state
  */
 export function cullGroups(recipe, state) {
@@ -76,11 +78,11 @@ export function countLabel(n, total) {
 
 /**
  * What to send as `item_ids`: the checked ingredients, in the recipe's own order.
- * @param {{item_ids: number[]}} recipe
+ * @param {{ingredients: object[]}} recipe
  * @param {Set<number>} checked
  */
 export function chosenIds(recipe, checked) {
-  return recipe.item_ids.filter((id) => checked.has(id));
+  return ingredientIds(recipe).filter((id) => checked.has(id));
 }
 
 /**

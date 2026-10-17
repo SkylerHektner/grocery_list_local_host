@@ -19,18 +19,25 @@ async fn create_with_and_without_items() {
     let body = app
         .post_ok(
             "/api/recipes",
-            json!({ "name": " pancakes ", "item_ids": [milk, eggs, milk] }),
+            json!({ "name": " pancakes ", "ingredients": [
+                { "item_id": milk, "note": " 1  cup " },
+                { "item_id": eggs },
+                { "item_id": milk, "note": "dup" },
+            ] }),
         )
         .await;
     let id = body["id"].as_u64().unwrap();
     assert_eq!(
         body["state"]["recipes"].as_array().unwrap().last().unwrap(),
-        &json!({ "id": id, "name": "Pancakes", "item_ids": [milk, eggs] })
+        &json!({ "id": id, "name": "Pancakes", "ingredients": [
+            { "item_id": milk, "note": "1 cup" },
+            { "item_id": eggs, "note": null },
+        ] })
     );
 
     let body = app.post_ok("/api/recipes", json!({ "name": "Soup" })).await;
     let soup = recipe(&app, body["id"].as_u64().unwrap());
-    assert!(soup.item_ids.is_empty());
+    assert!(soup.ingredients.is_empty());
     assert!(
         app.listed().is_empty(),
         "creating a recipe does not touch the list"
@@ -50,7 +57,7 @@ async fn create_errors() {
     assert_eq!(
         app.post_err(
             "/api/recipes",
-            json!({ "name": "Soup", "item_ids": [milk, 999] }),
+            json!({ "name": "Soup", "ingredients": [{ "item_id": milk }, { "item_id": 999 }] }),
             400
         )
         .await,
@@ -60,20 +67,37 @@ async fn create_errors() {
     let tacos = app.recipe_id("Tacos");
     app.post_err(
         "/api/recipes",
-        json!({ "name": "Soup", "item_ids": [tacos] }),
+        json!({ "name": "Soup", "ingredients": [{ "item_id": tacos }] }),
         400,
     )
     .await;
+    let long = "x".repeat(81);
+    assert_eq!(
+        app.post_err(
+            "/api/recipes",
+            json!({ "name": "Soup", "ingredients": [{ "item_id": milk, "note": long }] }),
+            400
+        )
+        .await,
+        "note is too long (81 characters, max 80)"
+    );
     assert_eq!(
         app.post_err("/api/recipes", json!({ "name": " " }), 400)
             .await,
         "recipe name must not be empty"
     );
-    app.post_err("/api/recipes", json!({ "item_ids": [] }), 400)
+    app.post_err("/api/recipes", json!({ "ingredients": [] }), 400)
         .await;
     app.post_err(
         "/api/recipes",
-        json!({ "name": "Soup", "item_ids": milk }),
+        json!({ "name": "Soup", "ingredients": [milk] }),
+        400,
+    )
+    .await;
+    // The old shape is rejected, not silently ignored.
+    app.post_err(
+        "/api/recipes",
+        json!({ "name": "Soup", "item_ids": [milk] }),
         400,
     )
     .await;
@@ -94,14 +118,17 @@ async fn update_replaces_name_and_items_and_leaves_the_list_alone() {
     let body = app
         .put_ok(
             &format!("/api/recipes/{tacos}"),
-            json!({ "name": "taco night", "item_ids": [milk, salt, salt] }),
+            json!({ "name": "taco night", "ingredients": [
+                { "item_id": milk, "note": "2%" }, { "item_id": salt }, { "item_id": salt },
+            ] }),
         )
         .await;
 
     assert_eq!(body["id"], tacos);
     let r = recipe(&app, tacos);
     assert_eq!(r.name, "Taco night");
-    assert_eq!(r.item_ids, [milk, salt]);
+    assert_eq!(r.item_ids(), [milk, salt]);
+    assert_eq!(r.note_for(milk), Some("2%"));
     // Limes keeps its Tacos source although it is no longer an ingredient.
     assert_eq!(app.db().list, list_before);
     assert_eq!(
@@ -112,7 +139,7 @@ async fn update_replaces_name_and_items_and_leaves_the_list_alone() {
     // Same name in a different case is fine.
     app.put_ok(
         &format!("/api/recipes/{tacos}"),
-        json!({ "name": "TACO NIGHT", "item_ids": [] }),
+        json!({ "name": "TACO NIGHT", "ingredients": [] }),
     )
     .await;
 }
@@ -124,27 +151,31 @@ async fn update_errors() {
     let uri = format!("/api/recipes/{tacos}");
 
     assert_eq!(
-        app.put_err(&uri, json!({ "name": "stir fry", "item_ids": [] }), 409)
+        app.put_err(&uri, json!({ "name": "stir fry", "ingredients": [] }), 409)
             .await,
         "a recipe named \"Stir Fry\" already exists"
     );
     assert_eq!(
-        app.put_err(&uri, json!({ "name": "Tacos", "item_ids": [999] }), 400)
-            .await,
+        app.put_err(
+            &uri,
+            json!({ "name": "Tacos", "ingredients": [{ "item_id": 999 }] }),
+            400
+        )
+        .await,
         "item 999 does not exist"
     );
     assert_eq!(
         app.put_err(
             "/api/recipes/999",
-            json!({ "name": "X", "item_ids": [] }),
+            json!({ "name": "X", "ingredients": [] }),
             404
         )
         .await,
         "recipe 999 not found"
     );
     let msg = app.put_err(&uri, json!({ "name": "Tacos" }), 400).await;
-    assert!(msg.contains("missing field `item_ids`"), "{msg}");
-    app.put_err(&uri, json!({ "item_ids": [] }), 400).await;
+    assert!(msg.contains("missing field `ingredients`"), "{msg}");
+    app.put_err(&uri, json!({ "ingredients": [] }), 400).await;
 }
 
 #[tokio::test]

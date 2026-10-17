@@ -196,7 +196,7 @@ export function errorField(message) {
 
 /** Recipes that use the item, by name. */
 export function itemRecipes(itemId, state) {
-  return state.recipes.filter((r) => r.item_ids.includes(itemId)).sort((a, b) => compareNames(a.name, b.name));
+  return state.recipes.filter((r) => r.ingredients.some((i) => i.item_id === itemId)).sort((a, b) => compareNames(a.name, b.name));
 }
 
 /** "Tacos", "Tacos and Stir Fry", "A, B, C and 2 more". */

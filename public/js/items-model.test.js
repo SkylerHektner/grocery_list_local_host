@@ -24,6 +24,8 @@ import {
   usageLabel,
 } from './items-model.js';
 
+const ings = (...ids) => ids.map((item_id) => ({ item_id, note: null }));
+
 const item = (id, name, category_id, extra = {}) => ({
   id,
   name,
@@ -52,9 +54,9 @@ function state({ entries = [] } = {}) {
       item(15, 'Pecorino', null, { aliases: ['Romano'], use_count: 2 }),
     ],
     recipes: [
-      { id: 20, name: 'Tacos', item_ids: [13, 11, 12] },
-      { id: 21, name: 'Carbonara', item_ids: [10, 12, 15] },
-      { id: 22, name: 'Cacio e pepe', item_ids: [15] },
+      { id: 20, name: 'Tacos', ingredients: ings(13, 11, 12) },
+      { id: 21, name: 'Carbonara', ingredients: ings(10, 12, 15) },
+      { id: 22, name: 'Cacio e pepe', ingredients: ings(15) },
     ],
     list: {
       entries: entries.map((id) => ({ item_id: id, note: null, sources: [{ kind: 'manual' }], added_at: 1 })),

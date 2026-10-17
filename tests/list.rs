@@ -254,7 +254,7 @@ async fn add_recipe_adds_the_culled_subset_with_a_recipe_source() {
     );
     let entry = app.entry(beef).unwrap();
     assert_eq!(entry.sources, [Source::Recipe { recipe_id: tacos }]);
-    assert_eq!(entry.note, None);
+    assert_eq!(entry.note.as_deref(), Some("1 lb"), "the recipe's note");
     assert_eq!(app.db().list.recipe_ids, [tacos]);
     assert_eq!(app.usage(beef).0, 1);
     assert_eq!(app.usage(salt), salt_usage, "culled items are not touched");
@@ -385,6 +385,31 @@ async fn remove_recipe_keeps_items_added_manually_or_by_another_recipe() {
         app.db().find_recipe(tacos).is_ok(),
         "the recipe itself stays"
     );
+}
+
+#[tokio::test]
+async fn recipe_notes_fill_empty_notes_and_leave_with_the_chip() {
+    // Demo Tacos: Ground beef "1 lb", Limes "2".
+    let app = TestApp::demo();
+    let beef = app.add_to_list("Ground beef").await;
+    app.post_ok(
+        "/api/list/items",
+        json!({ "item_id": app.item_id("Limes"), "note": "6" }),
+    )
+    .await;
+    let tacos = app
+        .add_recipe_to_list("Tacos", &["Ground beef", "Limes", "Avocados"])
+        .await;
+    let note = |id| app.entry(id).unwrap().note;
+    let (limes, avocados) = (app.item_id("Limes"), app.item_id("Avocados"));
+    assert_eq!(note(beef).as_deref(), Some("1 lb"), "empty note filled");
+    assert_eq!(note(limes).as_deref(), Some("6"), "existing note kept");
+    assert_eq!(note(avocados), None, "no recipe note");
+
+    app.delete_ok(&format!("/api/list/recipes/{tacos}")).await;
+    assert_eq!(app.listed(), [beef, limes]);
+    assert_eq!(note(beef), None, "the recipe's note leaves with it");
+    assert_eq!(note(limes).as_deref(), Some("6"));
 }
 
 #[tokio::test]
@@ -536,7 +561,7 @@ async fn catalog_deletes_and_merges_clear_undo_but_other_catalog_edits_keep_it()
     .await;
     app.put_ok(
         &format!("/api/recipes/{tacos}"),
-        json!({ "name": "Tacos", "item_ids": [eggs] }),
+        json!({ "name": "Tacos", "ingredients": [{ "item_id": eggs }] }),
     )
     .await;
     app.post_ok("/api/recipes", json!({ "name": "Omelette" }))

@@ -12,6 +12,8 @@ import {
   searchModel,
 } from './omnibar-model.js';
 
+const ings = (...ids) => ids.map((item_id) => ({ item_id, note: null }));
+
 const item = (id, name, extra = {}) => ({
   id,
   name,
@@ -32,8 +34,8 @@ const state = {
     item(5, 'Half-and-half'),
   ],
   recipes: [
-    { id: 10, name: 'Tacos', item_ids: [4] },
-    { id: 11, name: 'Pancakes', item_ids: [1, 2] },
+    { id: 10, name: 'Tacos', ingredients: ings(4) },
+    { id: 11, name: 'Pancakes', ingredients: ings(1, 2) },
   ],
 };
 

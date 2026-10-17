@@ -2,7 +2,7 @@
 
 mod common;
 
-use rust_html_server::model::{Item, Source};
+use rust_html_server::model::{Ingredient, Item, Source};
 use serde_json::json;
 
 use common::TestApp;
@@ -204,7 +204,7 @@ async fn delete_cascades_out_of_recipes_and_list_and_clears_undo() {
     let db = app.db();
     assert!(db.find_item(eggs).is_err());
     for recipe in [carbonara, weekly] {
-        assert!(!db.find_recipe(recipe).unwrap().item_ids.contains(&eggs));
+        assert!(!db.find_recipe(recipe).unwrap().has_item(eggs));
     }
     assert_eq!(app.listed(), [app.item_id("Bacon")]);
     assert_eq!(db.list.recipe_ids, [carbonara]);
@@ -245,19 +245,19 @@ async fn merge_folds_everything_into_the_target() {
     let tacos = app.recipe_id("Tacos");
     let carbonara = app.recipe_id("Spaghetti Carbonara");
     // Pecorino joins Tacos (no Parmigiano) and Carbonara (has Parmigiano).
-    let tacos_items = app.db().find_recipe(tacos).unwrap().item_ids.clone();
-    let mut new_tacos = tacos_items.clone();
-    new_tacos.insert(0, pecorino);
+    let tacos_items = app.db().find_recipe(tacos).unwrap().item_ids();
+    let mut new_tacos = app.db().find_recipe(tacos).unwrap().ingredients.clone();
+    new_tacos.insert(0, Ingredient::new(pecorino));
     app.put_ok(
         &format!("/api/recipes/{tacos}"),
-        json!({ "name": "Tacos", "item_ids": new_tacos }),
+        json!({ "name": "Tacos", "ingredients": new_tacos }),
     )
     .await;
-    let mut new_carbonara = app.db().find_recipe(carbonara).unwrap().item_ids.clone();
-    new_carbonara.push(pecorino);
+    let mut new_carbonara = app.db().find_recipe(carbonara).unwrap().ingredients.clone();
+    new_carbonara.push(Ingredient::new(pecorino));
     app.put_ok(
         &format!("/api/recipes/{carbonara}"),
-        json!({ "name": "Spaghetti Carbonara", "item_ids": new_carbonara }),
+        json!({ "name": "Spaghetti Carbonara", "ingredients": new_carbonara }),
     )
     .await;
     app.add_recipe_to_list("Spaghetti Carbonara", &["Parmigiano Reggiano"])
@@ -288,12 +288,12 @@ async fn merge_folds_everything_into_the_target() {
     assert!(!p.staple, "target keeps its staple flag");
     assert_eq!(p.use_count, p_count + q_count);
     assert_eq!(p.last_used, p_last.max(q_last));
-    assert_eq!(db.find_recipe(tacos).unwrap().item_ids[0], parm);
+    assert_eq!(db.find_recipe(tacos).unwrap().item_ids()[0], parm);
     assert_eq!(
-        db.find_recipe(tacos).unwrap().item_ids[1..],
+        db.find_recipe(tacos).unwrap().item_ids()[1..],
         tacos_items[..]
     );
-    let carb = &db.find_recipe(carbonara).unwrap().item_ids;
+    let carb = &db.find_recipe(carbonara).unwrap().item_ids();
     assert_eq!(carb.iter().filter(|&&i| i == parm).count(), 1);
     assert!(!carb.contains(&pecorino));
     let entry = app.entry(parm).unwrap();

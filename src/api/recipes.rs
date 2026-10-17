@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use super::{Mutation, reply};
 use crate::error::{ApiJson, ApiPath};
-use crate::model::Id;
+use crate::model::{Id, Ingredient};
 use crate::store::{AppState, ListUndo};
 
 pub fn routes() -> Router<AppState> {
@@ -21,30 +21,30 @@ pub fn routes() -> Router<AppState> {
 struct NewRecipe {
     name: String,
     #[serde(default)]
-    item_ids: Vec<Id>,
+    ingredients: Vec<Ingredient>,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RecipeUpdate {
     name: String,
-    item_ids: Vec<Id>,
+    ingredients: Vec<Ingredient>,
 }
 
-/// `POST /api/recipes {name, item_ids?}` → id of the new recipe.
+/// `POST /api/recipes {name, ingredients?: [{item_id, note?}]}` → id of the new recipe.
 async fn create(State(app): State<AppState>, ApiJson(body): ApiJson<NewRecipe>) -> Mutation {
-    app.mutate(|db| db.create_recipe(&body.name, &body.item_ids))
+    app.mutate(|db| db.create_recipe(&body.name, &body.ingredients))
         .map(reply)
 }
 
-/// `PUT /api/recipes/{id} {name, item_ids}` → full replace; the list is untouched.
+/// `PUT /api/recipes/{id} {name, ingredients}` → full replace; the list is untouched.
 async fn update(
     State(app): State<AppState>,
     ApiPath(id): ApiPath<Id>,
     ApiJson(body): ApiJson<RecipeUpdate>,
 ) -> Mutation {
     app.mutate(|db| {
-        db.update_recipe(id, &body.name, &body.item_ids)
+        db.update_recipe(id, &body.name, &body.ingredients)
             .map(|()| id)
     })
     .map(reply)

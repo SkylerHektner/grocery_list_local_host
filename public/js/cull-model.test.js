@@ -16,6 +16,8 @@ import {
   toggleOne,
 } from './cull-model.js';
 
+const ings = (...ids) => ids.map((item_id) => ({ item_id, note: null }));
+
 const item = (id, name, category_id, staple = false) => ({
   id,
   name,
@@ -42,7 +44,7 @@ function state(onList = [], items = []) {
       item(14, 'Garlic', 1, true),
       ...items,
     ],
-    recipes: [{ id: 20, name: 'Tacos', item_ids: [10, 11, 12, 13, 14] }],
+    recipes: [{ id: 20, name: 'Tacos', ingredients: ings(10, 11, 12, 13, 14) }],
     list: {
       entries: onList.map((id) => ({ item_id: id, note: null, sources: [{ kind: 'manual' }], added_at: 1 })),
       recipe_ids: [],
@@ -58,6 +60,16 @@ describe('rows and defaults', () => {
     const groups = cullGroups(s.recipesById.get(20), s);
     assert.deepEqual(groups.map((g) => g.name), ['Produce', 'Bakery', 'Pantry', 'Uncategorized']);
     assert.deepEqual(ingredientOrder(groups), [14, 12, 11, 13, 10]);
+  });
+
+  test('rows carry the recipe note for each ingredient', () => {
+    const s = state();
+    s.recipesById.get(20).ingredients[2].note = '2';
+    const rows = cullGroups(s.recipesById.get(20), s).flatMap((g) => g.rows);
+    assert.deepEqual(
+      rows.filter((r) => r.note).map((r) => [r.item.name, r.note]),
+      [['Limes', '2']],
+    );
   });
 
   test('everything starts checked except staples', () => {
@@ -96,8 +108,8 @@ describe('toggling and counting', () => {
   });
 
   test('chosenIds keeps the recipe order', () => {
-    assert.deepEqual(chosenIds({ item_ids: [5, 3, 9, 1] }, new Set([1, 9, 5])), [5, 9, 1]);
-    assert.deepEqual(chosenIds({ item_ids: [5] }, new Set([7])), []);
+    assert.deepEqual(chosenIds({ ingredients: ings(5, 3, 9, 1) }, new Set([1, 9, 5])), [5, 9, 1]);
+    assert.deepEqual(chosenIds({ ingredients: ings(5) }, new Set([7])), []);
   });
 });
 
@@ -109,7 +121,7 @@ describe('reconcileChecked (live sync while the dialog is open)', () => {
     const choices = new Set([10, 13]); // user unchecked 11, 12 and checked the staple Salt
 
     const s2 = state([], [item(15, 'Cilantro', 1), item(16, 'Pepper', 3, true)]);
-    const recipe = { id: 20, item_ids: [10, 11, 13, 14, 15, 16] }; // Limes left; 15, 16 new
+    const recipe = { id: 20, ingredients: ings(10, 11, 13, 14, 15, 16) }; // Limes left; 15, 16 new
     const next = reconcileChecked(choices, seen, cullGroups(recipe, s2));
     assert.deepEqual(ids(next), [10, 13, 15]);
   });

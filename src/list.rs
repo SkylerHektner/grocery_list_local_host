@@ -7,7 +7,7 @@
 //! something that is already there never counts twice.
 
 use crate::error::ApiError;
-use crate::model::{Db, Id, List, ListEntry, Source};
+use crate::model::{Db, Id, Ingredient, List, ListEntry, Source};
 use crate::names;
 
 /// What [`List::strip_recipe`] does with entries left without any source.
@@ -98,8 +98,9 @@ impl Db {
     /// `POST /api/list/recipes`: adds the culled `item_ids` (a subset of the recipe's
     /// ingredients, else 400; duplicates ignored) with this recipe as a source, and the recipe to
     /// `list.recipe_ids` (even when `item_ids` is empty, so the chip shows). Items already on the
-    /// list just gain the source. New entries follow the recipe's ingredient order. 404 unknown
-    /// recipe.
+    /// list just gain the source. New entries follow the recipe's ingredient order. Each entry
+    /// without a note gets the ingredient's note (an existing note is never replaced). 404
+    /// unknown recipe.
     pub fn add_recipe_to_list(
         &mut self,
         recipe_id: Id,
@@ -107,26 +108,29 @@ impl Db {
         now: u64,
     ) -> Result<(), ApiError> {
         let recipe = self.find_recipe(recipe_id)?;
-        if let Some(bad) = item_ids.iter().find(|id| !recipe.item_ids.contains(id)) {
+        if let Some(&bad) = item_ids.iter().find(|&&id| !recipe.has_item(id)) {
             return Err(ApiError::bad_request(format!(
                 "item {bad} is not an ingredient of \"{}\"",
                 recipe.name
             )));
         }
-        let chosen: Vec<Id> = (recipe.item_ids.iter())
-            .filter(|id| item_ids.contains(id))
-            .copied()
+        let chosen: Vec<Ingredient> = (recipe.ingredients.iter())
+            .filter(|i| item_ids.contains(&i.item_id))
+            .cloned()
             .collect();
         let source = Source::Recipe { recipe_id };
-        for item_id in chosen {
+        for Ingredient { item_id, note } in chosen {
             match self.list_entry_mut(item_id) {
                 Some(entry) => {
                     add_source(&mut entry.sources, source);
+                    if entry.note.is_none() {
+                        entry.note = note;
+                    }
                 }
                 None => {
                     self.list.entries.push(ListEntry {
                         item_id,
-                        note: None,
+                        note,
                         sources: vec![source],
                         added_at: now,
                     });
@@ -142,7 +146,9 @@ impl Db {
 
     /// `DELETE /api/list/recipes/{recipe_id}`: removes the chip and the recipe source from every
     /// entry; entries left without a source leave the list (items also added manually or by
-    /// another recipe stay). 404 unknown recipe or recipe not on the list.
+    /// another recipe stay). A staying entry whose note is still this recipe's note for it
+    /// loses that note, or takes the note of the first remaining recipe source that has one.
+    /// 404 unknown recipe or recipe not on the list.
     pub fn remove_recipe_from_list(&mut self, recipe_id: Id) -> Result<(), ApiError> {
         let recipe = self.find_recipe(recipe_id)?;
         if !self.list.recipe_ids.contains(&recipe_id) {
@@ -151,8 +157,30 @@ impl Db {
                 recipe.name
             )));
         }
+        let recipe = recipe.clone();
         self.list.strip_recipe(recipe_id, Orphans::Remove);
+        for i in 0..self.list.entries.len() {
+            let entry = &self.list.entries[i];
+            let Some(default) = recipe.note_for(entry.item_id) else {
+                continue;
+            };
+            if entry.note.as_deref() == Some(default) {
+                let fallback = self.recipe_note(entry);
+                self.list.entries[i].note = fallback;
+            }
+        }
         Ok(())
+    }
+
+    /// The note of the first recipe source of `entry` whose recipe has one for its item.
+    fn recipe_note(&self, entry: &ListEntry) -> Option<String> {
+        entry.sources.iter().find_map(|source| match source {
+            Source::Recipe { recipe_id } => {
+                let recipe = self.find_recipe(*recipe_id).ok()?;
+                recipe.note_for(entry.item_id).map(String::from)
+            }
+            Source::Manual => None,
+        })
     }
 
     /// `DELETE /api/list`: empties the list (entries and recipe chips).
@@ -421,6 +449,70 @@ mod tests {
             ApiError::not_found("\"Tacos\" is not on the list")
         );
         assert_eq!(db.remove_recipe_from_list(999).unwrap_err().status(), 404);
+    }
+
+    fn note(db: &Db, name: &str) -> Option<String> {
+        db.list_entry(id(db, name)).unwrap().note.clone()
+    }
+
+    fn set_recipe_note(db: &mut Db, recipe_id: Id, item_id: Id, note: &str) {
+        let recipe = db.find_recipe_mut(recipe_id).unwrap();
+        let ingredient = (recipe.ingredients.iter_mut())
+            .find(|i| i.item_id == item_id)
+            .unwrap();
+        ingredient.note = Some(note.into());
+    }
+
+    #[test]
+    fn recipe_add_fills_only_empty_notes() {
+        let mut db = db();
+        let (tacos, carbonara) = (recipe(&db, "Tacos"), recipe(&db, "Spaghetti Carbonara"));
+        let (beef, limes, salt) = (id(&db, "Ground beef"), id(&db, "Limes"), id(&db, "Salt"));
+        set_recipe_note(&mut db, carbonara, salt, "for the pasta water");
+        db.add_item_to_list(limes, Some("4"), NOW).unwrap();
+        db.add_item_to_list(salt, None, NOW).unwrap();
+
+        db.add_recipe_to_list(tacos, &[beef, limes, salt], NOW)
+            .unwrap();
+        assert_eq!(
+            note(&db, "Ground beef").as_deref(),
+            Some("1 lb"),
+            "new entry"
+        );
+        assert_eq!(note(&db, "Limes").as_deref(), Some("4"), "never replaced");
+        assert_eq!(note(&db, "Salt"), None, "Tacos has no note for salt");
+
+        // A second recipe fills the still-empty note.
+        db.add_recipe_to_list(carbonara, &[salt], NOW).unwrap();
+        assert_eq!(note(&db, "Salt").as_deref(), Some("for the pasta water"));
+        ok(&db);
+    }
+
+    #[test]
+    fn recipe_removal_clears_its_untouched_notes() {
+        let mut db = db();
+        let (tacos, carbonara) = (recipe(&db, "Tacos"), recipe(&db, "Spaghetti Carbonara"));
+        let (beef, limes, salt) = (id(&db, "Ground beef"), id(&db, "Limes"), id(&db, "Salt"));
+        set_recipe_note(&mut db, tacos, salt, "flaky");
+        set_recipe_note(&mut db, carbonara, salt, "coarse");
+        db.add_item_to_list(beef, None, NOW).unwrap();
+        db.add_item_to_list(limes, None, NOW).unwrap();
+        db.add_recipe_to_list(tacos, &[beef, limes, salt], NOW)
+            .unwrap();
+        db.add_recipe_to_list(carbonara, &[salt], NOW).unwrap();
+        db.set_list_note(limes, Some("3")).unwrap(); // edited by the user: kept
+        assert_eq!(note(&db, "Salt").as_deref(), Some("flaky"));
+
+        db.remove_recipe_from_list(tacos).unwrap();
+
+        assert_eq!(note(&db, "Ground beef"), None, "still Tacos' note: cleared");
+        assert_eq!(note(&db, "Limes").as_deref(), Some("3"));
+        assert_eq!(
+            note(&db, "Salt").as_deref(),
+            Some("coarse"),
+            "the remaining recipe's note takes over"
+        );
+        ok(&db);
     }
 
     #[test]

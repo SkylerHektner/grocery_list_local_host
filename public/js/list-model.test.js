@@ -14,6 +14,8 @@ import {
   summary,
 } from './list-model.js';
 
+const ings = (...ids) => ids.map((item_id) => ({ item_id, note: null }));
+
 const item = (id, name, category_id) => ({
   id,
   name,
@@ -43,8 +45,8 @@ function state(entries, recipeIds = []) {
       item(16, 'Butter', 3),
     ],
     recipes: [
-      { id: 20, name: 'Pancakes', item_ids: [10, 11] },
-      { id: 21, name: 'Cake', item_ids: [11, 16] },
+      { id: 20, name: 'Pancakes', ingredients: ings(10, 11) },
+      { id: 21, name: 'Cake', ingredients: ings(11, 16) },
     ],
     list: { entries, recipe_ids: recipeIds },
   });

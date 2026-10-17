@@ -10,7 +10,7 @@ test.skip(({ isMobile }) => !isMobile, 'phone layout only');
 
 type Snapshot = {
   items: { id: number; name: string }[];
-  recipes: { id: number; name: string; item_ids: number[] }[];
+  recipes: { id: number; name: string; ingredients: { item_id: number; note: string | null }[] }[];
   list: { entries: { item_id: number }[] };
 };
 
@@ -96,7 +96,7 @@ test('a whole phone session by tapping: add items, add a recipe via the sheet, r
   await resetList(request);
   const recipe = `${uniqueName()} soup`;
   const itemIds = await ids(request, ['Yellow onions', 'Carrots', 'Garlic', 'Chicken stock']);
-  expect((await request.post('/api/recipes', { data: { name: recipe, item_ids: itemIds } })).ok()).toBeTruthy();
+  expect((await request.post('/api/recipes', { data: { name: recipe, ingredients: itemIds.map((item_id) => ({ item_id })) } })).ok()).toBeTruthy();
   // A phone on plain HTTP: no Clipboard API.
   await page.addInitScript(() => {
     Object.defineProperty(Navigator.prototype, 'clipboard', { get: () => undefined, configurable: true });
@@ -171,7 +171,7 @@ test('tap targets are at least 44 px in every view and dialog', async ({ page, r
   await addToList(request, ['Milk', 'Parmigiano Reggiano']);
   const carbonara = (await state(request)).recipes.find((r) => r.name === 'Spaghetti Carbonara')!;
   expect(
-    (await request.post('/api/list/recipes', { data: { recipe_id: carbonara.id, item_ids: carbonara.item_ids } })).ok(),
+    (await request.post('/api/list/recipes', { data: { recipe_id: carbonara.id, item_ids: carbonara.ingredients.map((i) => i.item_id) } })).ok(),
   ).toBeTruthy();
 
   await open(page, '#/list');
@@ -225,7 +225,7 @@ test('long names wrap between words next to recipe tags; no horizontal scroll an
   await resetList(request);
   const carbonara = (await state(request)).recipes.find((r) => r.name === 'Spaghetti Carbonara')!;
   expect(
-    (await request.post('/api/list/recipes', { data: { recipe_id: carbonara.id, item_ids: carbonara.item_ids } })).ok(),
+    (await request.post('/api/list/recipes', { data: { recipe_id: carbonara.id, item_ids: carbonara.ingredients.map((i) => i.item_id) } })).ok(),
   ).toBeTruthy();
   await open(page, '#/list');
   const name = listRow(page, 'Parmigiano Reggiano').getByTestId('row-name');

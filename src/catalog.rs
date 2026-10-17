@@ -4,13 +4,13 @@
 //! Each function validates before it changes anything and returns an [`ApiError`] on failure
 //! (and `mutate` discards its draft anyway, so a failed call never leaves partial edits).
 //! Status rules: an unknown id in the URL (the thing being acted on) is a 404 via the
-//! `Db::find_*` helpers; an unknown id inside a body *value* (`category_id`, recipe `item_ids`,
+//! `Db::find_*` helpers; an unknown id inside a body *value* (`category_id`, recipe ingredients,
 //! the category order) is a 400 ([`unknown`]); duplicate names are 409s.
 
 use std::collections::HashSet;
 
 use crate::error::ApiError;
-use crate::model::{Category, Db, Id, Item, ListEntry, Recipe};
+use crate::model::{Category, Db, Id, Ingredient, Item, ListEntry, Recipe};
 use crate::names;
 
 /// The editable fields of an item, raw from the client (validated by `create_item` /
@@ -141,13 +141,13 @@ impl Db {
         Ok(())
     }
 
-    /// Deletes an item and every reference to it: recipes' `item_ids` and its list entry (recipe
+    /// Deletes an item and every reference to it: recipe ingredients and its list entry (recipe
     /// chips stay on the list). 404 unknown id. Callers clear the list-undo history.
     pub fn delete_item(&mut self, id: Id) -> Result<(), ApiError> {
         self.find_item(id)?;
         self.items.retain(|i| i.id != id);
         for recipe in &mut self.recipes {
-            recipe.item_ids.retain(|&i| i != id);
+            recipe.ingredients.retain(|i| i.item_id != id);
         }
         self.list.entries.retain(|e| e.item_id != id);
         Ok(())
@@ -156,7 +156,8 @@ impl Db {
     /// Merges item `id` (A) into `into_id` (B), then deletes A:
     /// - list: A's entry folds into B's (sources unioned, B's note kept unless B has none,
     ///   B's `added_at` kept); if only A was on the list its entry now names B;
-    /// - recipes: A is replaced by B (just removed where B is already an ingredient);
+    /// - recipes: A is replaced by B, note and all (where B is already an ingredient A is just
+    ///   removed, and B's note kept unless B has none);
     /// - B gains A's name and aliases as aliases, A's category if B has none, the sum of the
     ///   `use_count`s and the later `last_used`; B's name and staple flag are kept.
     ///
@@ -196,12 +197,18 @@ impl Db {
         }
 
         for recipe in &mut self.recipes {
-            if let Some(pos) = recipe.item_ids.iter().position(|&i| i == id) {
-                if recipe.item_ids.contains(&into_id) {
-                    recipe.item_ids.remove(pos);
-                } else {
-                    recipe.item_ids[pos] = into_id;
+            let Some(pos) = recipe.ingredients.iter().position(|i| i.item_id == id) else {
+                continue;
+            };
+            match recipe.ingredients.iter().position(|i| i.item_id == into_id) {
+                Some(b) => {
+                    let a = recipe.ingredients.remove(pos);
+                    let b = &mut recipe.ingredients[if b > pos { b - 1 } else { b }];
+                    if b.note.is_none() {
+                        b.note = a.note;
+                    }
                 }
+                None => recipe.ingredients[pos].item_id = into_id,
             }
         }
 
@@ -221,41 +228,57 @@ impl Db {
 
     // --- recipes ---
 
-    /// Ingredient ids for a recipe: each must be a known item (400), duplicates dropped (the
-    /// first occurrence keeps its position).
-    fn recipe_item_ids(&self, item_ids: &[Id]) -> Result<Vec<Id>, ApiError> {
-        let mut out: Vec<Id> = Vec::with_capacity(item_ids.len());
-        for &id in item_ids {
-            if self.find_item(id).is_err() {
-                return Err(unknown("item", id));
+    /// Validated ingredients for a recipe: each must be a known item (400) with a valid note
+    /// (400; normalized like list notes), duplicates dropped (the first occurrence wins).
+    fn recipe_ingredients(&self, raw: &[Ingredient]) -> Result<Vec<Ingredient>, ApiError> {
+        let mut out: Vec<Ingredient> = Vec::with_capacity(raw.len());
+        for ingredient in raw {
+            let item_id = ingredient.item_id;
+            if self.find_item(item_id).is_err() {
+                return Err(unknown("item", item_id));
             }
-            if !out.contains(&id) {
-                out.push(id);
+            let note = names::validate_note(ingredient.note.as_deref())?;
+            if !out.iter().any(|i| i.item_id == item_id) {
+                out.push(Ingredient { item_id, note });
             }
         }
         Ok(out)
     }
 
-    /// 400 invalid name or unknown item, 409 duplicate name.
-    pub fn create_recipe(&mut self, name: &str, item_ids: &[Id]) -> Result<Id, ApiError> {
+    /// 400 invalid name, unknown item or invalid note, 409 duplicate name.
+    pub fn create_recipe(
+        &mut self,
+        name: &str,
+        ingredients: &[Ingredient],
+    ) -> Result<Id, ApiError> {
         let name = names::validate_name(name, "recipe name")?;
-        let item_ids = self.recipe_item_ids(item_ids)?;
+        let ingredients = self.recipe_ingredients(ingredients)?;
         self.check_recipe_name(&name, None)?;
         let id = self.alloc_id();
-        self.recipes.push(Recipe { id, name, item_ids });
+        self.recipes.push(Recipe {
+            id,
+            name,
+            ingredients,
+        });
         Ok(id)
     }
 
-    /// Replaces name and ingredients. The list is left alone: entries keep this recipe as a
-    /// source even if the item is no longer an ingredient. 404 unknown id.
-    pub fn update_recipe(&mut self, id: Id, name: &str, item_ids: &[Id]) -> Result<(), ApiError> {
+    /// Replaces name and ingredients (with their notes). The list is left alone: entries keep
+    /// this recipe as a source (and any note it gave them) even if the item is no longer an
+    /// ingredient. 404 unknown id.
+    pub fn update_recipe(
+        &mut self,
+        id: Id,
+        name: &str,
+        ingredients: &[Ingredient],
+    ) -> Result<(), ApiError> {
         self.find_recipe(id)?;
         let name = names::validate_name(name, "recipe name")?;
-        let item_ids = self.recipe_item_ids(item_ids)?;
+        let ingredients = self.recipe_ingredients(ingredients)?;
         self.check_recipe_name(&name, Some(id))?;
         let recipe = self.find_recipe_mut(id)?;
         recipe.name = name;
-        recipe.item_ids = item_ids;
+        recipe.ingredients = ingredients;
         Ok(())
     }
 
@@ -284,6 +307,10 @@ mod tests {
 
     fn id_of(db: &Db, name: &str) -> Id {
         db.item_by_name_ci(name).unwrap().id
+    }
+
+    fn ings(ids: &[Id]) -> Vec<Ingredient> {
+        ids.iter().map(|&id| Ingredient::new(id)).collect()
     }
 
     fn fields(name: &str) -> ItemFields {
@@ -443,7 +470,7 @@ mod tests {
         db.delete_item(eggs).unwrap();
 
         assert!(db.find_item(eggs).is_err());
-        assert!(db.recipes.iter().all(|r| !r.item_ids.contains(&eggs)));
+        assert!(db.recipes.iter().all(|r| !r.has_item(eggs)));
         assert!(db.list.entries.is_empty());
         assert_eq!(db.list.recipe_ids, [carbonara], "the chip stays");
         assert_eq!(db.delete_item(eggs).unwrap_err().status(), 404);
@@ -464,15 +491,16 @@ mod tests {
             .unwrap();
         let carbonara = db.recipe_by_name_ci("Spaghetti Carbonara").unwrap().id;
         let tacos = db.recipe_by_name_ci("Tacos").unwrap().id;
-        // Pecorino is in Tacos (no Parmigiano there) and in Carbonara (which has Parmigiano).
-        db.find_recipe_mut(tacos)
-            .unwrap()
-            .item_ids
-            .insert(1, pecorino);
-        db.find_recipe_mut(carbonara)
-            .unwrap()
-            .item_ids
-            .push(pecorino);
+        // Pecorino is in Tacos (no Parmigiano there) and in Carbonara (which has Parmigiano,
+        // without a note: it adopts Pecorino's).
+        let note = |n: &str| Ingredient {
+            item_id: pecorino,
+            note: Some(n.into()),
+        };
+        let tacos_recipe = db.find_recipe_mut(tacos).unwrap();
+        tacos_recipe.ingredients.insert(1, note("a wedge"));
+        let carbonara_recipe = db.find_recipe_mut(carbonara).unwrap();
+        carbonara_recipe.ingredients.push(note("finely grated"));
         db.list.recipe_ids = vec![carbonara, tacos];
         db.list.entries = vec![
             entry(
@@ -501,11 +529,14 @@ mod tests {
         assert_eq!((p.use_count, p.last_used), (5, 900));
         assert_eq!(p.category_id, Some(3), "B keeps its own category");
         assert!(!p.staple, "B keeps its staple flag");
-        let tacos_items = &db.find_recipe(tacos).unwrap().item_ids;
-        assert_eq!(tacos_items[1], parm);
-        let carbonara_items = &db.find_recipe(carbonara).unwrap().item_ids;
+        let tacos_recipe = db.find_recipe(tacos).unwrap();
+        assert_eq!(tacos_recipe.item_ids()[1], parm);
+        assert_eq!(tacos_recipe.note_for(parm), Some("a wedge"));
+        let carbonara_recipe = db.find_recipe(carbonara).unwrap();
+        let carbonara_items = carbonara_recipe.item_ids();
         assert_eq!(carbonara_items.iter().filter(|&&i| i == parm).count(), 1);
         assert!(!carbonara_items.contains(&pecorino));
+        assert_eq!(carbonara_recipe.note_for(parm), Some("finely grated"));
         assert_eq!(
             db.list.entries,
             [entry(
@@ -582,24 +613,51 @@ mod tests {
     fn recipes_create_update_validate_and_dedupe() {
         let mut db = db();
         let (milk, eggs) = (id_of(&db, "Milk"), id_of(&db, "Eggs"));
-        let id = db.create_recipe(" pancakes ", &[milk, eggs, milk]).unwrap();
+        let noted = |item_id, note: &str| Ingredient {
+            item_id,
+            note: Some(note.into()),
+        };
+        let id = db
+            .create_recipe(
+                " pancakes ",
+                &[
+                    noted(milk, "  1   cup "),
+                    Ingredient::new(eggs),
+                    noted(milk, "x"),
+                ],
+            )
+            .unwrap();
         let r = db.find_recipe(id).unwrap();
         assert_eq!(r.name, "Pancakes");
-        assert_eq!(r.item_ids, [milk, eggs]);
+        assert_eq!(r.item_ids(), [milk, eggs]);
+        assert_eq!(
+            r.note_for(milk),
+            Some("1 cup"),
+            "normalized; first duplicate wins"
+        );
+        assert_eq!(r.note_for(eggs), None);
         assert_eq!(db.create_recipe("tacos", &[]).unwrap_err().status(), 409);
         assert_eq!(
-            db.create_recipe("Soup", &[milk, 999]).unwrap_err(),
+            db.create_recipe("Soup", &ings(&[milk, 999])).unwrap_err(),
             unknown("item", 999)
         );
         // A recipe id is not an item.
-        assert_eq!(db.create_recipe("Soup", &[id]).unwrap_err().status(), 400);
-
-        db.update_recipe(id, "Crêpes", &[eggs]).unwrap();
-        let r = db.find_recipe(id).unwrap();
         assert_eq!(
-            (r.name.as_str(), r.item_ids.as_slice()),
-            ("Crêpes", &[eggs][..])
+            db.create_recipe("Soup", &ings(&[id])).unwrap_err().status(),
+            400
         );
+        let long = "x".repeat(81);
+        assert_eq!(
+            db.create_recipe("Soup", &[noted(milk, &long)])
+                .unwrap_err()
+                .status(),
+            400
+        );
+        // A blank note is no note.
+        db.update_recipe(id, "Crêpes", &[noted(eggs, " ")]).unwrap();
+        let r = db.find_recipe(id).unwrap();
+        assert_eq!(r.name, "Crêpes");
+        assert_eq!(r.ingredients, ings(&[eggs]));
         assert_eq!(db.update_recipe(999, "X", &[]).unwrap_err().status(), 404);
         assert_eq!(
             db.update_recipe(id, "Stir fry", &[]).unwrap_err().status(),

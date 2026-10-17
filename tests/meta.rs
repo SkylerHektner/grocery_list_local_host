@@ -151,7 +151,7 @@ async fn state_of_a_demo_db_has_the_demo_catalog() {
         snapshot
             .recipes
             .iter()
-            .any(|r| r.id == carbonara && r.item_ids.contains(&parm))
+            .any(|r| r.id == carbonara && r.has_item(parm))
     );
     assert_eq!(app.category_id("Deli & Cheese"), 3);
     app.assert_consistent();

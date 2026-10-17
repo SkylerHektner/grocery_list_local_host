@@ -1,20 +1,27 @@
 // A recipe's ingredient rows in the editor (SPEC §3.7): grouped by category in walk order like
-// the list, each removable by keyboard and tap. Rows are keyed by item id, so focus survives
-// live-sync re-renders. Keys on a focused row: ↑/↓ (j/k) move (↑ on the first: back to the
-// search), Home/End, Delete/Backspace/x remove (focus moves to the next row, else the previous,
-// else the search), / or Esc back to the search.
+// the list, each with the note the recipe gives the item's list entry. Rows are keyed by item
+// id, so focus and an open note editor survive live-sync re-renders. Keys on a focused row:
+// ↑/↓ (j/k) move (↑ on the first: back to the search), Home/End, Enter/n edit the note (Enter
+// saves, Esc cancels, empty clears), Delete/Backspace/x remove (focus moves to the next row,
+// else the previous, else the search), / or Esc back to the search. DOM: recipe-ingredient-view.js.
 //
-// Removals show at once (optimistically) and run through the editor's queue, each reading the
-// latest recipe; the toast's Undo puts the ingredient back where it was.
+// Removals and note edits show at once (optimistically) and run through the editor's queue, each
+// reading the latest recipe; the toast's Undo puts a removed ingredient (and its note) back
+// where it was.
 
 import { h, isTypingTarget, rerender } from '../dom.js';
-import { icon } from '../icons.js';
 import { fallbackFocus, neighborAfterRemoval } from '../list-model.js';
-import { ingredientGroups, ingredientOrder, restoreIngredient, withoutIngredient } from '../recipes-model.js';
-import { noteArt } from '../components/empty.js';
+import {
+  ingredientGroups,
+  ingredientOrder,
+  normalizeNote,
+  restoreIngredient,
+  withIngredientNote,
+  withoutIngredient,
+} from '../recipes-model.js';
+import { ingredientGroupView, ingredientsEmptyView } from './recipe-ingredient-view.js';
 
 const FLASH_MS = 1600;
-const kbd = (key) => h('kbd', { class: 'kbd' }, key);
 
 /**
  * @param {object} deps
@@ -27,112 +34,56 @@ const kbd = (key) => h('kbd', { class: 'kbd' }, key);
  */
 export function createIngredientRows({ recipeId, store, api, queue, toast, focusSearch }) {
   const pending = new Set(); // item ids removed locally, response not in yet
+  const pendingNotes = new Map(); // item id -> note saved locally, response not in yet
   const flashes = new Map(); // item id -> time its highlight started
+  let editingId = null;
   let cursorId = null;
   let order = [];
+  let rendering = false;
   let destroyed = false;
 
   const el = h('div', { class: 'list-body ingredients', testid: 'ingredients', onKeydown, onFocusin });
   const latest = () => store.state.recipesById.get(recipeId);
 
+  const view = {
+    editingId,
+    cursorId,
+    flashes,
+    now: 0,
+    onEdit: startEdit,
+    onRemove: remove,
+    onSave: (id, value) => saveNote(id, value, true),
+    onCancel: cancelEdit,
+    onBlur: (id, input) => {
+      // Re-renders replace the input; only a real blur (click/tap elsewhere) saves.
+      if (!rendering && input.isConnected && editingId === id) saveNote(id, input.value, false);
+    },
+  };
+
   // ── Rendering ──────────────────────────────────────────────────────────────────────────
-
-  function row({ item, staple }, now) {
-    const id = item.id;
-    const flashed = flashes.get(id);
-    return h(
-      'li',
-      {
-        class: ['row', 'list-row', 'ingredient-row', flashed && 'is-flash'],
-        style: flashed ? { animationDelay: `-${now - flashed}ms` } : null,
-        tabindex: id === cursorId ? '0' : '-1',
-        'aria-label': staple ? `${item.name}, staple` : item.name,
-        testid: 'ingredient-row',
-        dataset: { key: `ingredient-${id}`, itemId: String(id) },
-      },
-      h('span', { class: 'row-main' }, h('span', { class: 'row-name', testid: 'ingredient-name' }, item.name)),
-      staple && h('span', { class: 'row-tags' }, h('span', { class: 'tag tag-warm', title: 'Starts unchecked when the recipe goes on the list' }, 'staple')),
-      h(
-        'span',
-        { class: 'row-actions' },
-        h(
-          'button',
-          {
-            type: 'button',
-            class: 'btn btn-ghost btn-icon btn-sm row-remove',
-            tabindex: '-1',
-            'aria-label': `Remove ${item.name} from the recipe`,
-            title: 'Remove (Delete)',
-            testid: 'ingredient-remove',
-            onClick: (e) => {
-              e.stopPropagation();
-              remove(id);
-            },
-          },
-          icon('close', { size: 18 }),
-        ),
-      ),
-    );
-  }
-
-  function emptyView() {
-    return h(
-      'div',
-      { class: 'empty list-empty', testid: 'ingredients-empty' },
-      noteArt(),
-      h('h2', { class: 'empty-title' }, 'No ingredients yet'),
-      h(
-        'p',
-        { class: 'empty-body' },
-        h('span', { class: 'only-keys' }, 'Type an item and press ', kbd('Enter'), '. Then the next one.'),
-        h('span', { class: 'only-touch' }, 'Type an item above and tap it to add it.'),
-      ),
-      h(
-        'ul',
-        { class: 'empty-tips' },
-        h(
-          'li',
-          null,
-          h('span', { class: 'only-keys' }, kbd('Shift+Enter'), ' creates a new item'),
-          h('span', { class: 'only-touch' }, 'Unknown items can be created on the spot'),
-        ),
-        h('li', null, 'Staples start unchecked when the recipe goes on the list'),
-      ),
-    );
-  }
 
   function render() {
     const recipe = latest();
     if (destroyed || !recipe) return;
-    const visible = { ...recipe, item_ids: recipe.item_ids.filter((id) => !pending.has(id)) };
-    const groups = ingredientGroups(visible, store.state);
+    const groups = ingredientGroups(recipe, store.state, { hidden: pending, notes: pendingNotes });
     const before = order;
     const next = ingredientOrder(groups);
     const hadFocus = el.contains(document.activeElement);
     const focusedId = hadFocus ? rowIdOf(document.activeElement) : null;
+    if (editingId !== null && !next.includes(editingId)) editingId = null;
     if (cursorId === null || !next.includes(cursorId)) {
       cursorId = cursorId === null ? (next[0] ?? null) : fallbackFocus(before, next, cursorId);
     }
     order = next;
     const now = Date.now();
     for (const [id, start] of flashes) if (now - start > FLASH_MS) flashes.delete(id);
-    rerender(el, () =>
-      groups.length
-        ? groups.map((g) =>
-            h(
-              'section',
-              { class: 'list-group', testid: 'ingredient-group', 'data-category': g.name, 'aria-label': g.name },
-              h(
-                'h2',
-                { class: 'group-header', 'aria-hidden': 'true' },
-                h('span', { class: 'group-name' }, g.name),
-                h('span', { class: 'group-count' }, g.rows.length),
-              ),
-              h('ul', { class: 'rows', role: 'list' }, g.rows.map((r) => row(r, now))),
-            ),
-          )
-        : emptyView(),
-    );
+    Object.assign(view, { editingId, cursorId, now });
+    rendering = true;
+    try {
+      rerender(el, () => (groups.length ? groups.map((g) => ingredientGroupView(g, view)) : ingredientsEmptyView()));
+    } finally {
+      rendering = false;
+    }
     // The focused row went away (removed here or on another device): focus its neighbour.
     if (hadFocus && !el.contains(document.activeElement)) {
       const id = focusedId === null ? null : fallbackFocus(before, next, focusedId);
@@ -154,6 +105,7 @@ export function createIngredientRows({ recipeId, store, api, queue, toast, focus
 
   function setCursor(id) {
     cursorId = id;
+    view.cursorId = id;
     for (const li of el.querySelectorAll('.ingredient-row')) li.tabIndex = Number(li.dataset.itemId) === id ? 0 : -1;
   }
 
@@ -171,6 +123,49 @@ export function createIngredientRows({ recipeId, store, api, queue, toast, focus
     if (id !== null) setCursor(id);
   }
 
+  // ── Notes ──────────────────────────────────────────────────────────────────────────────
+
+  function startEdit(id) {
+    if (editingId === id) return;
+    editingId = id;
+    setCursor(id);
+    render();
+    const input = el.querySelector(`[data-key="ingredient-note-${id}"]`);
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }
+
+  function cancelEdit(id) {
+    editingId = null;
+    render();
+    focusRow(id);
+  }
+
+  function saveNote(id, value, refocus) {
+    if (editingId !== id) return;
+    editingId = null;
+    const recipe = latest();
+    const next = normalizeNote(value);
+    const changed = !!recipe && withIngredientNote(recipe, id, next) !== null;
+    if (changed) pendingNotes.set(id, next);
+    render();
+    if (refocus) focusRow(id);
+    if (!changed) return;
+    queue
+      .run(async () => {
+        const current = latest();
+        const ingredients = current ? withIngredientNote(current, id, next) : null;
+        if (ingredients) await api.updateRecipe(recipeId, { name: current.name, ingredients });
+      })
+      .catch(() => {})
+      .finally(() => {
+        pendingNotes.delete(id);
+        render();
+      });
+  }
+
   // ── Removing ───────────────────────────────────────────────────────────────────────────
 
   function remove(id) {
@@ -178,6 +173,7 @@ export function createIngredientRows({ recipeId, store, api, queue, toast, focus
     if (!item || pending.has(id)) return;
     const neighbour = neighborAfterRemoval(order, id);
     const hadFocus = el.contains(document.activeElement);
+    if (editingId === id) editingId = null;
     pending.add(id);
     if (cursorId === id) cursorId = neighbour;
     render();
@@ -188,16 +184,17 @@ export function createIngredientRows({ recipeId, store, api, queue, toast, focus
     queue
       .run(async () => {
         const recipe = latest();
-        const index = recipe ? recipe.item_ids.indexOf(id) : -1;
+        const index = recipe ? recipe.ingredients.findIndex((i) => i.item_id === id) : -1;
         if (index < 0) return null;
-        await api.updateRecipe(recipeId, { name: recipe.name, item_ids: withoutIngredient(recipe, id) });
-        return { index, recipeName: recipe.name };
+        const ingredient = recipe.ingredients[index];
+        await api.updateRecipe(recipeId, { name: recipe.name, ingredients: withoutIngredient(recipe, id) });
+        return { index, ingredient, recipeName: recipe.name };
       })
       .then(
         (done) => {
           if (!done) return;
           toast(`Removed ${item.name} from ${done.recipeName}`, {
-            action: { label: 'Undo', onClick: () => restore(id, done.index) },
+            action: { label: 'Undo', onClick: () => restore(done.ingredient, done.index) },
           });
         },
         () => {},
@@ -208,12 +205,13 @@ export function createIngredientRows({ recipeId, store, api, queue, toast, focus
       });
   }
 
-  function restore(id, index) {
+  function restore(ingredient, index) {
     queue
       .run(async () => {
         const recipe = latest();
-        const ids = recipe && store.state.itemsById.has(id) ? restoreIngredient(recipe, id, index) : null;
-        if (ids) await api.updateRecipe(recipeId, { name: recipe.name, item_ids: ids });
+        const known = store.state.itemsById.has(ingredient.item_id);
+        const ingredients = recipe && known ? restoreIngredient(recipe, ingredient, index) : null;
+        if (ingredients) await api.updateRecipe(recipeId, { name: recipe.name, ingredients });
       })
       .catch(() => {});
   }
@@ -240,6 +238,10 @@ export function createIngredientRows({ recipeId, store, api, queue, toast, focus
         break;
       case 'End':
         focusRow(order[order.length - 1]);
+        break;
+      case 'Enter':
+      case 'n':
+        startEdit(id);
         break;
       case 'Delete':
       case 'Backspace':

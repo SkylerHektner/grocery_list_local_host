@@ -26,9 +26,12 @@
 //!   Basmati rice, Olive oil\*
 //! - **Weekly Staples:** Bananas, Milk, Eggs, Greek yogurt, Sourdough bread, Sparkling water
 //!
+//! Ingredient notes: Tacos gives Ground beef "1 lb" and Limes "2"; Spaghetti Carbonara gives
+//! Eggs "4 yolks + 1 whole".
+//!
 //! The list starts empty and all usage stats are 0.
 
-use crate::model::{Db, Item, Recipe};
+use crate::model::{Db, Ingredient, Item, Recipe};
 
 pub struct DemoItem {
     pub name: &'static str,
@@ -42,6 +45,17 @@ pub struct DemoRecipe {
     pub name: &'static str,
     /// Item names from [`ITEMS`].
     pub items: &'static [&'static str],
+    /// `(item name, note)` for the ingredients that have a note.
+    pub notes: &'static [(&'static str, &'static str)],
+}
+
+impl DemoRecipe {
+    pub fn note_for(&self, item: &str) -> Option<&'static str> {
+        self.notes
+            .iter()
+            .find(|(n, _)| *n == item)
+            .map(|&(_, note)| note)
+    }
 }
 
 const fn item(category: &'static str, name: &'static str) -> DemoItem {
@@ -154,6 +168,7 @@ pub const RECIPES: &[DemoRecipe] = &[
             "Taco seasoning",
             "Salt",
         ],
+        notes: &[("Ground beef", "1 lb"), ("Limes", "2")],
     },
     DemoRecipe {
         name: "Spaghetti Carbonara",
@@ -166,6 +181,7 @@ pub const RECIPES: &[DemoRecipe] = &[
             "Black pepper",
             "Salt",
         ],
+        notes: &[("Eggs", "4 yolks + 1 whole")],
     },
     DemoRecipe {
         name: "Stir Fry",
@@ -179,6 +195,7 @@ pub const RECIPES: &[DemoRecipe] = &[
             "Basmati rice",
             "Olive oil",
         ],
+        notes: &[],
     },
     DemoRecipe {
         name: "Weekly Staples",
@@ -190,6 +207,7 @@ pub const RECIPES: &[DemoRecipe] = &[
             "Sourdough bread",
             "Sparkling water",
         ],
+        notes: &[],
     },
 ];
 
@@ -214,17 +232,20 @@ pub fn seed(db: &mut Db) {
         });
     }
     for demo in RECIPES {
-        let item_ids = demo
-            .items
-            .iter()
-            .filter_map(|name| db.item_by_name_ci(name))
-            .map(|i| i.id)
+        let ingredients = (demo.items.iter())
+            .filter_map(|&name| {
+                let item_id = db.item_by_name_ci(name)?.id;
+                Some(Ingredient {
+                    item_id,
+                    note: demo.note_for(name).map(String::from),
+                })
+            })
             .collect();
         let id = db.alloc_id();
         db.recipes.push(Recipe {
             id,
             name: demo.name.to_string(),
-            item_ids,
+            ingredients,
         });
     }
 }
@@ -265,9 +286,17 @@ mod tests {
         let db = seeded();
         for (demo, recipe) in RECIPES.iter().zip(&db.recipes) {
             assert_eq!(recipe.name, demo.name);
-            assert_eq!(recipe.item_ids.len(), demo.items.len(), "{}", demo.name);
-            for (name, id) in demo.items.iter().zip(&recipe.item_ids) {
-                assert_eq!(db.find_item(*id).unwrap().name, *name);
+            assert_eq!(recipe.ingredients.len(), demo.items.len(), "{}", demo.name);
+            for (name, ingredient) in demo.items.iter().zip(&recipe.ingredients) {
+                assert_eq!(db.find_item(ingredient.item_id).unwrap().name, *name);
+                assert_eq!(ingredient.note.as_deref(), demo.note_for(name));
+            }
+            for (name, note) in demo.notes {
+                assert!(demo.items.contains(name), "{name}");
+                assert_eq!(
+                    names::validate_note(Some(note)).unwrap().as_deref(),
+                    Some(*note)
+                );
             }
         }
     }
@@ -326,10 +355,8 @@ mod tests {
         // BBQ sauce keeps its capitals; every recipe has a staple to cull except Weekly Staples.
         assert!(db.item_by_name_ci("BBQ sauce").is_some());
         for recipe in &db.recipes[..3] {
-            let has_staple = recipe
-                .item_ids
-                .iter()
-                .any(|id| db.find_item(*id).unwrap().staple);
+            let has_staple =
+                (recipe.ingredients.iter()).any(|i| db.find_item(i.item_id).unwrap().staple);
             assert!(has_staple, "{}", recipe.name);
         }
     }
