@@ -36,7 +36,8 @@
 import { api } from './api.js';
 import { bindLiveSync, createLiveSync, store } from './store.js';
 import { DEFAULT_VIEW, VIEWS, hashFor, parseHash } from './router.js';
-import { h, isTypingTarget } from './dom.js';
+import { h, isKeyboardDevice, isTypingTarget, parkFocus, setFocusFallback } from './dom.js';
+import { trackVisualViewport } from './viewport.js';
 import { toast } from './components/toast.js';
 import { confirm, isModalOpen } from './components/dialog.js';
 import { openShortcutHelp } from './components/shortcut-help.js';
@@ -47,7 +48,8 @@ import categoriesView from './views/categories.js';
 
 const VIEW_MODULES = { list: listView, recipes: recipesView, items: itemsView, categories: categoriesView };
 const APP_NAME = 'Grocery list';
-const SYNC_LABELS = { connecting: 'Connecting…', live: 'Live', offline: 'Offline' };
+// [label, extra words hidden on phones]
+const SYNC_LABELS = { connecting: ['Connecting…', ''], live: ['Live', ''], offline: ['Offline', ' — reconnecting'] };
 
 const viewRoot = document.getElementById('view-root');
 const syncStatus = document.querySelector('[data-testid="sync-status"]');
@@ -146,13 +148,14 @@ function renderWaiting() {
 }
 
 function setSyncStatus(status) {
+  const [label, more] = SYNC_LABELS[status] ?? [status, ''];
   syncStatus.dataset.state = status;
-  syncStatus.querySelector('.sync-label').textContent = SYNC_LABELS[status] ?? status;
+  syncStatus.querySelector('.sync-label').replaceChildren(label, more ? h('span', { class: 'sync-more' }, more) : '');
   syncStatus.title =
     status === 'live'
       ? 'Up to date: changes from other devices appear within seconds'
       : status === 'offline'
-        ? "Can't reach the server; retrying every few seconds"
+        ? "Can't reach the server. Reconnecting automatically; changes can't be saved until then."
         : 'Connecting to the server…';
   if (!store.state) renderWaiting();
 }
@@ -160,6 +163,13 @@ function setSyncStatus(status) {
 function focusSearch() {
   current?.view.focusSearch?.();
 }
+
+// Focus lost with the element that had it (a toast's Undo, a dialog's re-rendered opener): the
+// search box on keyboard devices; on touch screens the view area (no on-screen keyboard pop-up).
+setFocusFallback(() => {
+  if (isKeyboardDevice() && current) focusSearch();
+  else parkFocus();
+});
 
 function showShortcuts() {
   const view = current?.view;
@@ -216,6 +226,7 @@ document.addEventListener('keydown', onKeydown);
 document.querySelector('[data-testid="shortcuts-button"]').addEventListener('click', showShortcuts);
 window.addEventListener('hashchange', route);
 bindLiveSync(sync, window);
+trackVisualViewport(window);
 setSyncStatus('connecting');
 route();
 sync.start();

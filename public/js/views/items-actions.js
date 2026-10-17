@@ -16,8 +16,9 @@ import { pickCategory, pickMergeTarget } from './items-pickers.js';
  * @param {Function} host.confirm
  * @param {ReturnType<import('../queue.js').createQueue>} host.queue
  * @param {ReturnType<import('./items-rows.js').createItemRows>} host.rows
- * @param {() => void} host.render        re-render the rows (flash marks show)
- * @param {() => void} host.refresh       recompute the filter results, then render
+ * @param {(keepId?: number) => void} host.render   re-render the rows (flash marks show); the
+ *   keepId item's row stays rendered (never hidden behind "Show more")
+ * @param {(keepId?: number) => void} host.refresh  recompute the filter results, then render
  * @param {() => void} host.focusInput
  * @param {() => number|null} host.editingId   the item whose editor is open
  * @param {() => void} host.closeEditor   close it (focus goes to its row)
@@ -49,7 +50,7 @@ export function createItemActions(host) {
         (result) => {
           if (result === null || result === undefined) return;
           rows.flash(id);
-          host.render();
+          host.render(id);
           then(result);
         },
         () => {}, // the api toasted the server's message
@@ -124,7 +125,7 @@ export function createItemActions(host) {
     queue.run(() => api.mergeItem(id, intoId)).then(
       () => {
         rows.flash(intoId);
-        host.render();
+        host.render(intoId);
         rows.focusRow(keyOf(intoId));
         toast(`Merged ${from.name} into ${into.name}`);
       },
@@ -142,7 +143,7 @@ export function createItemActions(host) {
     try {
       const { id } = await queue.run(() => api.createItem({ name, category_id: choice.categoryId }));
       rows.flash(id);
-      host.refresh();
+      host.refresh(id);
       if (!rows.focusRow(keyOf(id))) host.focusInput();
     } catch {
       host.focusInput(); // the api toasted the server's message

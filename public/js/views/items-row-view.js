@@ -3,7 +3,8 @@
 
 import { h, highlight } from '../dom.js';
 import { icon } from '../icons.js';
-import { usageLabel } from '../items-model.js';
+import { itemRowLabel, usageLabel } from '../items-model.js';
+import { moreLabel } from '../paging.js';
 import { noteArt } from '../components/empty.js';
 
 const kbd = (key) => h('kbd', { class: 'kbd' }, key);
@@ -37,6 +38,7 @@ function aliasList(item, match) {
 export function itemRow(option, state, view) {
   const { item } = option;
   const category = state.categoriesById.get(item.category_id);
+  const usage = usageLabel(item);
   const attrs = {
     class: [
       'row',
@@ -48,6 +50,7 @@ export function itemRow(option, state, view) {
     ],
     style: view.flash ? { animationDelay: `-${view.now - view.flash}ms` } : null,
     tabindex: view.tabbable ? '0' : '-1',
+    'aria-label': view.editor ? null : itemRowLabel(item, state),
     testid: 'item-row',
     dataset: { key: option.key, itemId: String(item.id) },
   };
@@ -65,12 +68,13 @@ export function itemRow(option, state, view) {
         item.staple && h('span', { class: 'tag tag-warm', testid: 'item-staple', title: 'Starts unchecked when a recipe goes on the list' }, 'staple'),
         state.entriesByItemId.has(item.id) && h('span', { class: 'tag tag-accent', testid: 'item-on-list' }, 'on list'),
       ),
-      h(
-        'span',
-        { class: 'item-row-sub' },
-        item.aliases.length > 0 && h('span', { class: 'item-aliases', testid: 'item-aliases' }, 'aka ', aliasList(item, option)),
-        h('span', { class: 'item-usage', testid: 'item-usage' }, usageLabel(item)),
-      ),
+      (item.aliases.length > 0 || usage) &&
+        h(
+          'span',
+          { class: 'item-row-sub' },
+          item.aliases.length > 0 && h('span', { class: 'item-aliases', testid: 'item-aliases' }, 'aka ', aliasList(item, option)),
+          usage && h('span', { class: 'item-usage', testid: 'item-usage' }, usage),
+        ),
     ),
     enterHint(),
     h(
@@ -131,6 +135,25 @@ export function createRow(option, view) {
     },
     h('span', { class: 'item-row-main' }, h('span', { class: 'item-row-title' }, icon('plus', { size: 16 }), 'New item ', h('q', null, option.name))),
     enterHint(),
+  );
+}
+
+/**
+ * "Show 100 more (1145 not shown)": renders the next page of results (Enter or tap).
+ * @param {{key: string, more: number}} option
+ * @param {RowView} view
+ */
+export function moreRow(option, view) {
+  return h(
+    'li',
+    {
+      class: ['row', 'item-row', 'item-more'],
+      tabindex: view.tabbable ? '0' : '-1',
+      testid: 'items-more',
+      dataset: { key: option.key },
+      onClick: () => view.on.more(),
+    },
+    h('span', { class: 'item-row-main' }, h('span', { class: 'item-row-title' }, icon('chevron-down', { size: 16 }), moreLabel(option.more))),
   );
 }
 

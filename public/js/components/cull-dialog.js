@@ -109,7 +109,7 @@ export function openCullDialog({ recipe, store }) {
             'section',
             { class: 'cull-group', 'aria-label': g.name },
             h('h3', { class: 'group-header cull-group-header', 'aria-hidden': 'true' }, g.name),
-            h('ul', { class: 'rows cull-rows' }, g.rows.map(row)),
+            h('ul', { class: 'rows cull-rows', role: 'list' }, g.rows.map(row)),
           ),
         ),
       );

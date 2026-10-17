@@ -7,10 +7,11 @@
 // the `+ New item` row is on top), ↓ moves into the rows, Esc clears. Live sync re-renders the
 // rows but never touches the filter box or the open editor's fields.
 
-import { h, isKeyboardDevice } from '../dom.js';
+import { h, isKeyboardDevice, parkFocus } from '../dom.js';
 import { icon } from '../icons.js';
 import { createQueue } from '../queue.js';
 import { draftChanged, errorField, filterCounts, filterItems, itemsSummary } from '../items-model.js';
+import { ROW_PAGE, visibleResults } from '../paging.js';
 import { stickyBar } from '../components/sticky-bar.js';
 import { createItemActions } from './items-actions.js';
 import { createItemEditor } from './items-editor.js';
@@ -25,6 +26,8 @@ function mountItems(container, ctx) {
   let model = filterItems('', store.state, filters);
   let editor = null; // the open inline editor (one at a time)
   let inputFocused = false;
+  let limit = ROW_PAGE; // results rendered; "Show more" adds ROW_PAGE (reset by a new filter)
+  let keepId = null; // an item row that must stay rendered (just saved, created, merged into)
 
   const latest = (id) => store.state.itemsById.get(id);
   const keyOf = (id) => `item-${id}`;
@@ -40,7 +43,7 @@ function mountItems(container, ctx) {
     spellcheck: 'false',
     enterkeyhint: 'go',
     testid: 'items-search',
-    onInput: () => refresh(),
+    onInput: () => refilter(),
     onKeydown: onInputKeydown,
     onFocus: () => {
       inputFocused = true;
@@ -59,6 +62,7 @@ function mountItems(container, ctx) {
       category: (id) => actions.category(id),
       merge: (id) => actions.merge(id),
       delete: (id) => actions.delete(id),
+      more: () => showMore(),
     },
     focusSearch: (select) => focusInput(select),
   });
@@ -69,8 +73,8 @@ function mountItems(container, ctx) {
     confirm: ctx.confirm,
     queue,
     rows,
-    render: () => render(),
-    refresh: () => refresh(),
+    render: (keep) => render(keep),
+    refresh: (keep) => refresh(keep),
     focusInput: () => focusInput(),
     editingId: () => editor?.id ?? null,
     closeEditor: () => closeEditor(),
@@ -86,7 +90,7 @@ function mountItems(container, ctx) {
         testid: `filter-${key}`,
         onClick: () => {
           filters[key] = !filters[key];
-          refresh();
+          refilter();
         },
       },
       h('span', { class: 'filter-chip-label' }, label),
@@ -96,13 +100,16 @@ function mountItems(container, ctx) {
 
   // ── Model & rendering ──────────────────────────────────────────────────────────────────
 
+  /** The rows: the first `limit` results, then "Show more" and `+ New item "…"` when due. */
   function options() {
-    const opts = model.results.map((r) => ({ key: keyOf(r.item.id), ...r }));
+    const editing = editor ? latest(editor.id) : null;
+    const { shown, hidden } = visibleResults(model.results, limit, [editing?.id, keepId]);
+    const opts = shown.map((r) => ({ key: keyOf(r.item.id), ...r }));
     // The row being edited stays put even if the filter no longer matches it.
-    const editing = editor && latest(editor.id);
     if (editing && !opts.some((o) => o.item.id === editing.id)) {
       opts.unshift({ key: keyOf(editing.id), item: editing, text: editing.name, ranges: [], alias: null });
     }
+    if (hidden) opts.push({ key: 'more', more: hidden });
     if (model.createName) opts.push({ key: 'create', name: model.createName });
     return opts;
   }
@@ -112,12 +119,31 @@ function mountItems(container, ctx) {
     return inputFocused && model.query ? (opts[0]?.key ?? null) : null;
   }
 
-  function refresh() {
-    model = filterItems(input.value, store.state, filters);
-    render();
+  /** The filter text or a chip changed: start again from the first page of results. */
+  function refilter() {
+    limit = ROW_PAGE;
+    keepId = null;
+    refresh();
   }
 
-  function render() {
+  /** Recomputes the results (same filter); `keep`: an item id whose row must be rendered. */
+  function refresh(keep) {
+    model = filterItems(input.value, store.state, filters);
+    render(keep);
+  }
+
+  /** "Show more": the next page of rows; focus moves to the first new one if it was on the button. */
+  function showMore() {
+    const before = options();
+    const at = before.findIndex((o) => o.key === 'more');
+    const hadFocus = rows.hasFocus();
+    limit = Math.max(limit, at) + ROW_PAGE;
+    render();
+    if (hadFocus && at >= 0) rows.focusRow(options()[at]?.key);
+  }
+
+  function render(keep) {
+    if (keep !== undefined) keepId = keep;
     const opts = options();
     rows.render({ options: opts, state: store.state, editor, activeKey: activeKey(opts), query: model.query, filters });
     summaryEl.textContent = itemsSummary(store.state);
@@ -167,7 +193,7 @@ function mountItems(container, ctx) {
   function closeEditor() {
     const id = editor?.id;
     editor = null;
-    render();
+    render(id); // its row stays rendered, even if a rename sorted it past "Show more"
     if (id !== undefined && !rows.hasFocus()) rows.focusRow(keyOf(id));
   }
 
@@ -212,14 +238,14 @@ function mountItems(container, ctx) {
       const top = options()[0];
       if (!model.query || !top) return;
       if (top.item) edit(top.item.id);
-      else actions.create(top.name);
+      else if (top.name) actions.create(top.name);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       if (input.value) {
         input.value = '';
-        refresh();
+        refilter();
       } else {
-        input.blur();
+        parkFocus();
       }
     }
   }

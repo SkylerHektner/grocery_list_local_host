@@ -13,6 +13,9 @@ const collapse = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
 /** Max fuzzy matches in the merge picker. */
 export const MERGE_LIMIT = 30;
 
+/** Items listed in the merge picker while its filter is blank (alphabetical; typing finds the rest). */
+export const MERGE_BLANK_LIMIT = 100;
+
 /** True when the item has no (existing) category. */
 export function isUncategorized(item, state) {
   return !state.categoriesById.has(item.category_id);
@@ -85,10 +88,32 @@ export function itemsSummary(state) {
     .join(' · ');
 }
 
-/** "added 4×" / "never added" (times the item was put on the list). */
+/**
+ * What a screen reader says for a focused item row: "Salt, Pantry, staple, on the list, also
+ * Kosher salt, added 4 times".
+ */
+export function itemRowLabel(item, state) {
+  const category = state.categoriesById.get(item.category_id);
+  const n = item.use_count ?? 0;
+  return [
+    item.name,
+    category ? category.name : 'Uncategorized',
+    item.staple && 'staple',
+    state.entriesByItemId.has(item.id) && 'on the list',
+    item.aliases?.length && `also ${item.aliases.join(', ')}`,
+    n && (n === 1 ? 'added once' : `added ${n} times`),
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+/**
+ * "added 4×" (times the item was put on the list); null for an item never added, which shows
+ * nothing (a "never added" on most rows of a fresh catalog was just noise).
+ */
 export function usageLabel(item) {
   const n = item.use_count ?? 0;
-  return n ? `added ${n}×` : 'never added';
+  return n ? `added ${n}×` : null;
 }
 
 // ── Editing ─────────────────────────────────────────────────────────────────────────────────
@@ -212,8 +237,8 @@ export function mergeMessage(from, into, state) {
 }
 
 /**
- * The merge picker's choices: every other item by name when the filter is blank, else the best
- * fuzzy matches.
+ * The merge picker's choices: the other items by name while the filter is blank (the first
+ * MERGE_BLANK_LIMIT; typing finds the rest), else the best fuzzy matches (MERGE_LIMIT).
  * @returns {ItemResult[]}
  */
 export function mergeOptions(query, from, state) {
@@ -221,6 +246,7 @@ export function mergeOptions(query, from, state) {
   if (!normalize(collapse(query))) {
     return others
       .sort((a, b) => compareNames(a.name, b.name))
+      .slice(0, MERGE_BLANK_LIMIT)
       .map((item) => ({ item, text: item.name, ranges: [], alias: null }));
   }
   return search(query, others, { limit: MERGE_LIMIT }).map((r) => ({

@@ -233,7 +233,28 @@ every failed live-sync poll while the server is down (expected, but noisy in the
   delete category makes items Uncategorized, merge.
 
 ## T8 — Polish, mobile & hardening
-- [ ] Done
+- [x] Done
+
+Notes: Fixed: list rows wrap names between words (recipe tags live in the row's wrapping line,
+ellipsized); Items view renders 100 rows at a time with "Show 100 more" (`paging.js`; a row
+being edited/saved/created stays rendered), filter keystrokes went from ~100 ms to < 20 ms at
+1,245 items; merge picker lists 100 until you type; no "never added" noise; pick dialog `Tab` =
+Uncategorized; `role="list"` + per-row `aria-label`s; live sync backs off (3→6→12→24→30 s) with
+"Offline — reconnecting"; focus never lands on `<body>` (`parkFocus`/`focusFallback` in dom.js,
+dialogs refocus a re-rendered opener by `data-key`, toasts hand focus back, deleting the last
+category focuses "New category"); sheets/dropdowns sit above the on-screen keyboard
+(`viewport.js`); 44 px touch targets (brand, back link, chip ×, note input, recipe name, staple
+checkbox); `--ink-3`/`--offline` darkened to ≥ 4.5:1; `?` overlay gained Home/End, Backspace,
+Tab, filter Esc. Server: daily backup while running (`BACKUP_EVERY_SECS`), tests for concurrent
+devices (`tests/concurrency.rs`) and path traversal (`tests/app.rs`). New e2e specs: `mobile`,
+`a11y`, `perf` (big catalog via `page.route`, shared DB untouched). Known limitations / ideas:
+full-replace edits (`PUT` item/recipe) are last-writer-wins within the ~3 s sync window (idea:
+`If-Match: <version>` → 409 + refetch); deleting items/recipes/categories can't be undone in
+the app (backups only); switching away from a dirty item editor is refused with a hint rather
+than offering to save; no drag-and-drop reordering; Chromium still logs one console error per
+failed poll while offline (now backed off); the keyboard-aware sheets are verified by emulating
+`--vv-height`, not on a real iPhone; no service worker/offline mode; `components/omnibar.js`
+(~390 lines) is the one module well past ~300 lines (split the picker/keys out next time).
 
 - Mobile pass at 375×812 (tap targets, sticky omnibar, sheet dialogs) with Playwright coverage.
 - Accessibility pass: labels, roles, `aria-activedescendant` on listboxes, focus management.

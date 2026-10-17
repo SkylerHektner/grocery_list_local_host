@@ -5,8 +5,10 @@
 //
 // Toasts live in the `[data-testid="toasts"]` live region from index.html (created if missing),
 // newest at the bottom, at most MAX_VISIBLE at once. Auto-dismiss pauses while hovered/focused.
+// A toast that goes away while it has keyboard focus (its Undo was pressed) hands focus back to
+// where it came from, else to focusFallback() (the view's search box), never to <body>.
 
-import { h } from '../dom.js';
+import { focusFallback, h } from '../dom.js';
 import { icon } from '../icons.js';
 
 const MAX_VISIBLE = 4;
@@ -35,12 +37,17 @@ export function toast(message, { variant = 'info', action, duration } = {}) {
   const ms = duration ?? (action ? Math.max(ACTION_DURATION, DURATION[variant] ?? 0) : DURATION[variant] ?? 3500);
   let timer = null;
   let gone = false;
+  let returnTo = null; // what had focus before Tab moved into the toast
 
   function dismiss() {
     if (gone) return;
     gone = true;
     clearTimeout(timer);
+    const hadFocus = el.contains(document.activeElement);
     el.remove();
+    if (!hadFocus) return;
+    if (returnTo?.isConnected) returnTo.focus({ preventScroll: true });
+    else focusFallback();
   }
 
   function arm() {
@@ -57,7 +64,10 @@ export function toast(message, { variant = 'info', action, duration } = {}) {
       'data-variant': variant,
       onMouseenter: () => clearTimeout(timer),
       onMouseleave: arm,
-      onFocusin: () => clearTimeout(timer),
+      onFocusin: (e) => {
+        clearTimeout(timer);
+        if (e.relatedTarget instanceof HTMLElement && !el.contains(e.relatedTarget)) returnTo = e.relatedTarget;
+      },
       onFocusout: arm,
     },
     variant === 'error' ? icon('alert', { size: 18 }) : variant === 'success' ? icon('check', { size: 18 }) : null,

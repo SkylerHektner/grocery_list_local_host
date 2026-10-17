@@ -9,8 +9,10 @@ import {
   errorField,
   filterCounts,
   filterItems,
+  MERGE_BLANK_LIMIT,
   formatAliases,
   itemBody,
+  itemRowLabel,
   itemKeyAction,
   itemRecipes,
   itemsSummary,
@@ -107,9 +109,17 @@ test('filterCounts and itemsSummary', () => {
   assert.equal(itemsSummary(empty), 'No items yet');
 });
 
-test('usageLabel', () => {
-  assert.equal(usageLabel(item(1, 'A', null)), 'never added');
+test('usageLabel: nothing for never-added items', () => {
+  assert.equal(usageLabel(item(1, 'A', null)), null);
   assert.equal(usageLabel(item(1, 'A', null, { use_count: 4 })), 'added 4×');
+});
+
+test('itemRowLabel sums a row up for screen readers', () => {
+  const s = state({ entries: [12] });
+  assert.equal(itemRowLabel(s.itemsById.get(12), s), 'Salt, Pantry, staple, on the list, also Kosher salt');
+  assert.equal(itemRowLabel(s.itemsById.get(10), s), 'Parmigiano Reggiano, Deli & Cheese, also Parmesan, added 4 times');
+  assert.equal(itemRowLabel(s.itemsById.get(14), s), 'Birthday candles, Uncategorized');
+  assert.equal(itemRowLabel({ ...s.itemsById.get(11), use_count: 1 }, s), 'limes, Produce, added once');
 });
 
 describe('editing', () => {
@@ -209,6 +219,15 @@ describe('delete & merge messages', () => {
     assert.equal(found[0].item.name, 'Parmigiano Reggiano');
     assert.equal(found[0].alias, 'Parmesan');
     assert.deepEqual(mergeOptions('romano', from, s), []);
+  });
+
+  test('mergeOptions lists only the first MERGE_BLANK_LIMIT items while the filter is blank', () => {
+    const items = Array.from({ length: 300 }, (_, i) => item(1000 + i, `Thing ${String(i).padStart(3, '0')}`, 1));
+    const s = derive({ version: 1, categories: [{ id: 1, name: 'Produce' }], items, recipes: [], list: { entries: [], recipe_ids: [] } });
+    const blank = mergeOptions('', items[0], s);
+    assert.equal(blank.length, MERGE_BLANK_LIMIT);
+    assert.equal(blank[0].item.name, 'Thing 001');
+    assert.equal(mergeOptions('thing 299', items[0], s)[0].item.name, 'Thing 299');
   });
 });
 

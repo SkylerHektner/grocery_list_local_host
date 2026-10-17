@@ -40,6 +40,7 @@ function mountCategories(container, ctx) {
 
   const list = h('ol', {
     class: 'rows category-rows',
+    role: 'list', // list-style: none drops the list role in Safari
     'aria-label': 'Categories in walk order',
     testid: 'category-list',
     onKeydown,
@@ -94,7 +95,7 @@ function mountCategories(container, ctx) {
     // The focused row went away (deleted here or on another device): focus its neighbour.
     if (hadFocus && !list.contains(document.activeElement)) {
       const id = focusedId === null ? null : fallbackFocus(before, next, focusedId);
-      if (id !== null) focusRow(id, { scroll: false });
+      if (!(id !== null && focusRow(id, { scroll: false }))) newButton.focus(); // the last one went
     }
   }
 
@@ -263,6 +264,12 @@ function mountCategories(container, ctx) {
 
   // ── Layout ─────────────────────────────────────────────────────────────────────────────
 
+  const newButton = h(
+    'button',
+    { type: 'button', class: 'btn btn-primary btn-sm', testid: 'new-category', title: 'New category (n)', 'aria-keyshortcuts': 'N', onClick: add },
+    icon('plus', { size: 16 }),
+    'New category',
+  );
   container.classList.add('categories-view');
   container.append(
     h(
@@ -272,12 +279,7 @@ function mountCategories(container, ctx) {
         'div',
         { class: 'split-head categories-head' },
         h('h1', { class: 'view-title', testid: 'view-title' }, 'Store order'),
-        h(
-          'button',
-          { type: 'button', class: 'btn btn-primary btn-sm', testid: 'new-category', title: 'New category (n)', 'aria-keyshortcuts': 'N', onClick: add },
-          icon('plus', { size: 16 }),
-          'New category',
-        ),
+        newButton,
       ),
       summaryEl,
     ),
@@ -290,7 +292,7 @@ function mountCategories(container, ctx) {
   render();
   if (isKeyboardDevice()) focusRow(cursorId, { scroll: false });
 
-  return { focusSearch: () => focusRow(cursorId) };
+  return { focusSearch: () => focusRow(cursorId) || newButton.focus() };
 }
 
 export default {

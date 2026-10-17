@@ -2,11 +2,12 @@
 // owns the keyboard (Esc closes, Tab is trapped inside, Enter runs `onEnter` unless a button,
 // link or textarea has focus; a held-down, repeating Enter never confirms). While any modal is
 // open the app shell (#shell) is inert and the page doesn't scroll. On narrow screens CSS turns
-// the panel into a bottom sheet.
+// the panel into a bottom sheet that sits above the on-screen keyboard (viewport.js). Closing
+// returns focus to the opener, or to focusFallback() (dom.js) when the opener is gone.
 //
 //   if (await confirm({ title: 'Clear the list?', confirmLabel: 'Clear', danger: true })) …
 
-import { h } from '../dom.js';
+import { focusFallback, h } from '../dom.js';
 import { icon } from '../icons.js';
 
 /** @type {{layer: HTMLElement, panel: HTMLElement, onEnter?: () => void, requestClose: () => void}[]} */
@@ -25,6 +26,12 @@ const FOCUSABLE =
 
 function focusables(root) {
   return [...root.querySelectorAll(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+}
+
+/** The element now standing in for a removed `el` (same data-key), if any. */
+function twinOf(el) {
+  const key = el instanceof HTMLElement ? el.dataset.key : null;
+  return key ? document.querySelector(`[data-key="${CSS.escape(key)}"]`) : null;
 }
 
 function onKeydown(e) {
@@ -108,7 +115,15 @@ export function openModal({
     if (index >= 0) stack.splice(index, 1);
     layer.remove();
     sync();
-    if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
+    // Back to the opener, or its replacement when a live-sync re-render rebuilt it (same
+    // data-key, see rerender() in dom.js); else the dialog underneath, else the search box.
+    const target = opener?.isConnected ? opener : twinOf(opener);
+    if (target instanceof HTMLElement && target !== document.body) target.focus({ preventScroll: true });
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected) return;
+    const below = stack[stack.length - 1];
+    if (below) (focusables(below.panel)[0] ?? below.panel).focus({ preventScroll: true });
+    else focusFallback();
   }
 
   const requestClose = () => (onRequestClose ? onRequestClose() : close());

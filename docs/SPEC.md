@@ -47,7 +47,14 @@ and say which in the commit message. Task breakdown and status live in [TASKS.md
   changes nothing in memory or on disk.
 - On startup, if `db.json` exists and loads, copy it to
   `<data_dir>/backups/db-<unix_seconds>.json` (`db-<unix_seconds>-<n>.json` if several starts
-  happen in one second), keeping the 10 most recent backups.
+  happen in one second), keeping the 10 most recent backups. A server that keeps running also
+  copies `db.json` there before the first change once 24 h have passed since the last backup, so
+  the newest copy is never more than about a day old (a failed backup is logged to stderr and
+  never blocks the change).
+- Requests are applied one at a time (the DB mutex), so simultaneous edits from the laptop and
+  a phone each land exactly once with their own `version` (`tests/concurrency.rs`). Full-replace
+  edits (`PUT /api/items/{id}`, `PUT /api/recipes/{id}`) are last-writer-wins: the clients send
+  the latest state they have, which live sync keeps within a few seconds.
 - A `db.json` that cannot be read, is not valid JSON, lacks `schema_version` or has invalid data
   is a hard startup error naming the file; it is never replaced and never backed up (so restarts
   on a broken file cannot rotate the good backups out).
@@ -116,7 +123,8 @@ reused in the recipe editor for adding ingredients (`public/js/components/omniba
   are marked "on list". Matched characters are highlighted.
 - `↑`/`↓` move the highlight (clamped at the ends, no wrap-around); the highlight goes back to the
   top result whenever the text changes. `Enter` picks it; mouse/tap picks too. `Esc` clears the
-  input (second `Esc` blurs it). `↓` with an empty input moves focus into the list (3.5).
+  input (a second `Esc` leaves it: focus moves to the view itself, never to the page `<body>`).
+  `↓` with an empty input moves focus into the list (3.5).
 - Picking an item adds it to the list (manual source), clears the input, and keeps focus, so the
   user can rattle off `milk⏎ eggs⏎ bananas⏎` without touching the mouse. Enter always acts on the
   text currently in the box, and adds run one at a time in order, so fast typing never loses or
@@ -179,7 +187,8 @@ Pure function module (`public/js/fuzzy.js`), unit-tested with `node --test`. Req
   be within the typo budget of a word *prefix* (`strawv` → "Strawberries"). An empty query
   matches nothing.
 - Returns match ranges so the UI can highlight matched characters.
-- Fast: < 5 ms for 2,000 items on a laptop.
+- Fast: < 5 ms for 2,000 items on a laptop. End to end, with a 1,000+ item catalog the omnibar
+  and the Items filter re-render within 50 ms of every keystroke (`e2e/tests/perf.spec.ts`).
 
 ### 3.4 Recipes → list with culling (P0)
 
@@ -209,7 +218,9 @@ name, with category headers):
 
 - Entries grouped by category in walk order; Uncategorized last. Within a group, sorted by name.
 - Each entry shows: name, note (inline editable), source tags (recipe names), remove button
-  (always visible — no hover-only controls).
+  (always visible — no hover-only controls). Names wrap between words; the recipe tags follow
+  the name and note on the same line (right-aligned on wide screens) and drop below a long name
+  on a phone instead of squeezing it; a very long recipe name is shortened with "…".
 - "Recipes on this list" chips at the top; removing a chip removes the recipe source from all
   entries and removes entries left with no source (items also added manually or by another
   recipe stay). Removing an entry removes it whatever its sources; chips stay even when no entry
@@ -319,9 +330,14 @@ editor at `#/recipes/<id>`. Picking a recipe opens the cull dialog (§3.4).
 ### 3.8 Items catalog view (P1)
 
 - Fuzzy-filterable table of all items: name, category, aliases, staple flag, usage count
-  ("added 4×"), plus an "on list" tag. Sorted by name while the filter is empty. Quick-filter
-  chips "Uncategorized" and "Staples" (with counts; both on = both conditions); `#/items/
-  uncategorized` opens with the first one on (the Store order view links there).
+  ("added 4×"; nothing for items never added), plus an "on list" tag. Sorted by name while the
+  filter is empty. Quick-filter chips "Uncategorized" and "Staples" (with counts; both on = both
+  conditions); `#/items/uncategorized` opens with the first one on (the Store order view links
+  there).
+- Long catalogs render 100 rows at a time: a "Show 100 more" row (`Enter` on it, or tap) adds
+  the next 100 and moves focus to the first new row; changing the filter or a chip starts from
+  the first 100 again. A row being edited, or just saved, created or merged into, is always
+  rendered. This keeps filtering instant with thousands of items.
 - Inline edit of name, category (select), aliases (comma-separated), staple toggle. One editor
   at a time (switching away from an edited, unsaved one is refused with a hint); `Enter` saves,
   `Esc` cancels; the server's validation message shows inline on the field it is about (a name
@@ -331,7 +347,7 @@ editor at `#/recipes/<id>`. Picking a recipe opens the cull dialog (§3.4).
 - Keyboard: typing filters; `Enter` in the filter edits the top match; `↓` moves into the rows;
   on a row `↑`/`↓`/`j`/`k`/`Home`/`End` move (`↑` on the first returns to the filter), `Enter`/
   `F2` edit, `s` toggles staple, `c` opens a category picker (`1`–`9` by walk position, `0`
-  Uncategorized, typing filters, `Enter` picks), `m` merges, `Delete`/`Backspace` delete, `/`
+  or `Tab` Uncategorized like the omnibar picker, typing filters, `Enter` picks), `m` merges, `Delete`/`Backspace` delete, `/`
   or `Esc` back to the filter. Each row also has a category button (opens the picker) and the
   editor has "Merge into…" and "Delete" buttons, for touch.
 - Whenever the filter text does not name an item (or alias) exactly, the rows end with
@@ -345,8 +361,9 @@ editor at `#/recipes/<id>`. Picking a recipe opens the cull dialog (§3.4).
   Details: A's aliases become B's too; on the list, entries fold together (sources unioned, B's
   note kept unless it has none); recipes containing both keep B once; B adopts A's category only
   if uncategorized; usage counts are summed (`last_used` = later); B's name and staple flag stay.
-  UI: a fuzzy picker of the other items, then a confirm explaining the result ("Parmesan will
-  become an alias of Parmigiano Reggiano; 2 recipes updated. …").
+  UI: a fuzzy picker of the other items (the first 100 by name until something is typed), then
+  a confirm explaining the result ("Parmesan will become an alias of Parmigiano Reggiano; 2
+  recipes updated. …").
 
 ### 3.9 Categories / store order view (P1)
 
@@ -363,7 +380,12 @@ editor at `#/recipes/<id>`. Picking a recipe opens the cull dialog (§3.4).
 ### 3.10 Live sync across devices (P1)
 
 - Client polls `GET /api/version` every 3 s while the page is visible, and immediately on
-  `focus`/`visibilitychange`. If the version changed, it fetches `GET /api/state` and re-renders.
+  `focus`/`visibilitychange`/`online`. If the version changed, it fetches `GET /api/state` and
+  re-renders.
+- While the server can't be reached the header says "Offline — reconnecting" and polling backs
+  off (retries after 3 s, 6 s, 12 s, 24 s, then every 30 s; focusing the page retries at once),
+  so a stopped server or a sleeping PC isn't polled every 3 s (each failed request is a console
+  error in the browser). The first successful poll goes back to Live and the 3 s rhythm.
 - Re-render must never clobber what the user is typing (omnibar text, note editor, recipe editor
   name) or lose keyboard focus/selection.
 
@@ -374,11 +396,22 @@ editor at `#/recipes/<id>`. Picking a recipe opens the cull dialog (§3.4).
 - `Alt+1`…`Alt+4` switch views; `/` or `Ctrl+K` focuses the current view's search box; `?` opens
   a keyboard shortcut overlay.
 - Toast area for confirmations, errors (with the server's error message), and Undo.
-- The header shows a live-sync indicator (Live / Offline) and a keyboard button that opens the
-  shortcut overlay (for touch users).
-- Light and dark themes via `prefers-color-scheme`.
-- Responsive: single column ≤ 700 px with the view tabs as a bottom tab bar, sticky omnibar, tap
-  targets ≥ 44 px, dialogs as bottom sheets, no horizontal scroll at 360 px wide.
+- The header shows a live-sync indicator (Live / "Offline — reconnecting"; on phones just a
+  dot, plus "Offline" when offline) and a keyboard button that opens the shortcut overlay (for
+  touch users).
+- Light and dark themes via `prefers-color-scheme`. Text, muted text included, has at least
+  4.5:1 contrast in both.
+- Responsive: single column ≤ 700 px with the view tabs as a bottom tab bar that never covers
+  content or toasts, sticky omnibar, tap targets ≥ 44 px, dialogs as bottom sheets that sit
+  above the on-screen keyboard (`public/js/viewport.js` follows `window.visualViewport`; the
+  omnibar's dropdown is capped the same way), no horizontal scroll at 360 px wide
+  (`e2e/tests/mobile.spec.ts`).
+- Accessibility: the omnibar and pickers are ARIA comboboxes with a listbox and
+  `aria-activedescendant`; dialogs are `role="dialog"` + `aria-modal` named by their title; row
+  lists are `role="list"` with a short `aria-label` per focusable row; every control has a name.
+  Focus never falls back to the page `<body>`: closing a dialog returns it to the opener (or the
+  row that replaced it), a toast whose Undo had focus hands it back, and a removed row passes it
+  to a neighbour or the search box (`e2e/tests/a11y.spec.ts` walks every view by keyboard).
 
 ### 3.12 Hosting (P0)
 
@@ -440,7 +473,8 @@ src/
   lib.rs              pub fn app(state, static_dir) -> Router  (used by main and tests)
   config.rs           CLI flag / env var parsing (no clap)
   model.rs            serde types (Db, Category, Item, Recipe, List, Snapshot) + Db helpers
-  store.rs            load/save/backup/migrate/seed; AppState (Arc<Mutex<..>>), mutate, undo
+  store.rs            load/save/backup (startup + daily)/migrate/seed; AppState (Arc<Mutex<..>>),
+                      mutate, undo
   names.rs            normalization + validation
   demo.rs             --demo catalog (names relied on by tests)
   error.rs            ApiError -> JSON response; ApiJson / ApiPath extractors
@@ -448,7 +482,8 @@ src/
   list.rs             list edits: add/remove items and recipes, notes, clear (Db methods)
   export.rs           list -> text
   api/                one module per resource: categories, items, recipes, list, meta
-tests/                Rust integration tests (tower::ServiceExt::oneshot against app())
+tests/                Rust integration tests (tower::ServiceExt::oneshot against app()), incl.
+                      concurrent edits (concurrency.rs) and path traversal (app.rs)
 public/
   index.html
   css/app.css
@@ -457,7 +492,10 @@ public/
   js/api.js           fetch wrapper; mutations return state
   js/store.js         client state, subscribe, live-sync polling
   js/fuzzy.js         pure fuzzy matcher (+ fuzzy-text.js, fuzzy-tiers.js, fuzzy.test.js)
-  js/dom.js           h() element builder, highlight(), focus-preserving rerender()
+  js/dom.js           h() element builder, highlight(), focus-preserving rerender(),
+                      parkFocus()/focusFallback() (focus never left on <body>)
+  js/viewport.js      on-screen keyboard: visualViewport -> CSS vars for sheets/dropdowns
+  js/paging.js        "Show more" paging of long result lists (Items view)
   js/queue.js         serial mutation queue; js/clipboard.js: copy with fallbacks
   js/omnibar-model.js js/list-model.js js/recipes-model.js js/cull-model.js
   js/items-model.js js/categories-model.js
@@ -484,7 +522,10 @@ docs/                 SPEC.md, TASKS.md, API.md
 - `scripts/check.ps1` passes: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
   `cargo test`, `node --test "public/js/**/*.test.js"`, Playwright e2e.
 - Every API endpoint has integration tests (happy path + main error cases).
-- Every P0 keyboard flow has a Playwright test; mobile layout has a test at 375×812.
+- Every P0 keyboard flow has a Playwright test; mobile layout has a test at 375×812
+  (`mobile.spec.ts`: a whole phone session, tap targets, sheets, no horizontal scroll);
+  `a11y.spec.ts` walks every view by keyboard and checks roles/names and the Offline state;
+  `perf.spec.ts` holds the 50 ms keystroke budget with 1,000+ items.
 - Tests and dev servers **never** touch the real `data/` directory (temp dirs / port 3999).
 
 ## 7. Out of scope (v1)

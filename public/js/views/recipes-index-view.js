@@ -24,6 +24,7 @@ export function recipeRow(option, state, { active, tabbable, onOpen, onAdd }) {
     {
       class: ['row', 'recipe-row', active && 'is-active'],
       tabindex: tabbable ? '0' : '-1',
+      'aria-label': [recipe.name, ingredientCount(recipe), state.listRecipeIds.has(recipe.id) && 'on the list'].filter(Boolean).join(', '),
       testid: 'recipe-row',
       dataset: { key: option.key, recipeId: String(recipe.id) },
     },

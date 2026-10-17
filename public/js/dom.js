@@ -79,6 +79,44 @@ export function isKeyboardDevice() {
   return !matchMedia('(hover: none)').matches;
 }
 
+/**
+ * Leaves a field (Esc on an empty search box) without dropping focus on <body>: focus goes to
+ * the view area (`#view-root`, tabindex=-1), so single-key shortcuts work and Tab continues
+ * from there.
+ */
+export function parkFocus() {
+  const main = document.getElementById('view-root');
+  if (main) main.focus({ preventScroll: true });
+  else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+}
+
+let fallback = null;
+
+/** main.js: where focus goes when the element holding it disappears (see focusFallback). */
+export function setFocusFallback(fn) {
+  fallback = fn;
+}
+
+/**
+ * Focus was on something that just went away (a toast's Undo button, a dialog's opener that a
+ * re-render replaced): move it to the current view's search box on keyboard devices (the view
+ * area on touch screens, where focusing a field pops up the keyboard), never <body>.
+ */
+export function focusFallback() {
+  try {
+    fallback?.();
+  } finally {
+    const active = document.activeElement;
+    if (!active || active === document.body || !active.isConnected) parkFocus();
+  }
+}
+
+/** True when focus is nowhere useful: on <body> (or nothing). */
+export function focusIsLost() {
+  const active = document.activeElement;
+  return !active || active === document.body || active === document.documentElement;
+}
+
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number', '']);
 
 /** True when keystrokes on `el` type text (so single-key shortcuts must not fire). */

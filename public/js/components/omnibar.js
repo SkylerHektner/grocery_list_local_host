@@ -16,7 +16,7 @@
 //   container.append(omnibar.el);  ...  omnibar.destroy() on unmount
 //
 // Keys (mapped by keyAction() in omnibar-model.js): ↑/↓ move the highlight (clamped, no wrap),
-// Enter picks it, Shift+Enter creates an item, Esc clears (then calls onEscape / blurs).
+// Enter picks it, Shift+Enter creates an item, Esc clears (then calls onEscape / leaves the box).
 // Picker: 1-9 pick (only while the filter is empty), 0 or Tab = Uncategorized, typing filters,
 // Enter picks the highlight, Esc or Backspace on an empty filter goes back with the text intact.
 //
@@ -26,7 +26,9 @@
 // order. A pick that fails puts its text back if the input is still empty. Live-sync updates only
 // re-render the dropdown (the input is never replaced) and keep the highlighted option.
 
+import { parkFocus } from '../dom.js';
 import { createQueue } from '../queue.js';
+import { roomBelow } from '../viewport.js';
 import { categoryForDigit, categoryOptions, keyAction, moveIndex, searchModel } from '../omnibar-model.js';
 import {
   categoryRow,
@@ -57,7 +59,7 @@ let instances = 0;
  * @param {(recipe: object, opts: {note: string|null}) => unknown} [config.onPickRecipe]
  * @param {(name: string) => unknown} [config.onCreateRecipe]
  * @param {() => boolean} [config.onExitDown]
- * @param {() => void} [config.onEscape]    Esc on an empty input (default: blur)
+ * @param {() => void} [config.onEscape]    Esc on an empty input (default: focus goes to the view)
  */
 export function createOmnibar(config) {
   const {
@@ -99,6 +101,13 @@ export function createOmnibar(config) {
   });
 
   const rowHandlers = { itemBadge, recipeBadge, pick, hover };
+
+  // Phones: keep the dropdown above the on-screen keyboard (it shrinks the visible area).
+  const vv = globalThis.visualViewport;
+  const refit = () => {
+    if (!popup.hidden) fit();
+  };
+  vv?.addEventListener('resize', refit);
 
   const unsubscribe = store.subscribe(() => {
     if (focused || mode === 'picker') refresh(false);
@@ -161,8 +170,14 @@ export function createOmnibar(config) {
     }
     head.hidden = !head.childNodes.length;
     foot.replaceChildren(...footHints(mode));
+    fit();
     if (scrollTop) popup.scrollTop = 0;
     paintActive(true);
+  }
+
+  /** Caps the dropdown's height to the visible space below it (see viewport.js). */
+  function fit() {
+    popup.style.setProperty('--pop-room', `${roomBelow(popup.getBoundingClientRect().top, window)}px`);
   }
 
   /** Marks the highlighted option (aria-selected + activedescendant) without rebuilding rows. */
@@ -316,7 +331,7 @@ export function createOmnibar(config) {
         break;
       case 'leave':
         if (onEscape) onEscape();
-        else input.blur();
+        else parkFocus(); // leave the box, but keep focus in the view (not on <body>)
         break;
       case 'back':
         exitPicker();
@@ -366,6 +381,7 @@ export function createOmnibar(config) {
     destroy() {
       destroyed = true;
       unsubscribe();
+      vv?.removeEventListener('resize', refit);
     },
   };
 }

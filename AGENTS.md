@@ -15,7 +15,8 @@ src/lib.rs              pub fn app(state, static_dir) -> Router  <- used by main
 src/config.rs           flags/env parsing as a pure fn (unit tests inside)
 src/model.rs            serde types (Db, Item, ..., Snapshot, MutationResponse) + Db lookup/check helpers
 src/names.rs            name/alias/note normalization + validation
-src/store.rs            AppState: open/backup/migrate, mutate(|db| ..) = atomic save, list undo
+src/store.rs            AppState: open/backup/migrate, mutate(|db| ..) = atomic save (+ daily backup
+                        while running), list undo
 src/demo.rs             --demo catalog (item/recipe names documented at the top)
 src/error.rs            ApiError (-> {"error": msg}), ApiJson<T> body + ApiPath<T> path extractors
 src/catalog.rs          Db methods: category/item/recipe create/update/delete, reorder, item merge
@@ -24,7 +25,9 @@ src/export.rs           render(&Db) -> the plain-text export (SPEC 3.6)
 src/api/mod.rs          /api router + JSON 404/405 fallbacks; one submodule per resource
 src/api/meta.rs         GET /api/health, /api/state, /api/version
 src/api/{categories,items,recipes,list}.rs   thin handlers for the rest of SPEC 4
-tests/*.rs              integration tests: oneshot requests against app() (one file per resource)
+tests/*.rs              integration tests: oneshot requests against app() (one file per resource;
+                        concurrency.rs: simultaneous devices on a multi-thread runtime; app.rs:
+                        static serving incl. path traversal)
 tests/common/mod.rs     TestApp::new()/demo() (temp data dir): get/post/put/delete -> TestResponse,
                         post_ok/put_ok/delete_ok (asserts success + consistency), post_err/...
                         (asserts status + nothing changed), restart()
@@ -32,9 +35,15 @@ public/                 frontend, served from disk (no build step, no runtime de
   index.html            app shell markup (header, tabs, view root, toast region)
   css/app.css           design system: tokens (light/dark), components, responsive rules
   js/main.js            bootstrap, routing, global shortcuts; VIEW CONTRACT documented on top
-  js/api.js  store.js   JSON API client (mutations -> store) / client state + live sync
+  js/api.js  store.js   JSON API client (mutations -> store) / client state + live sync (polls
+                        every 3 s, backs off up to 30 s while offline)
   js/fuzzy*.js          fuzzy search: fuzzy.js API, fuzzy-text.js normalization, fuzzy-tiers.js
-  js/dom.js  icons.js   h() element builder, highlight(), rerender() / inline SVG icons
+  js/dom.js  icons.js   h() element builder, highlight(), rerender(), parkFocus() (Esc out of a
+                        field: focus to #view-root), focusFallback() (never leave focus on <body>)
+                        / inline SVG icons
+  js/viewport.js        on-screen keyboard: visualViewport -> --vv-top/--vv-height/--kb-inset
+                        on <html> (bottom sheets), roomBelow() (omnibar dropdown height)
+  js/paging.js          visibleResults()/moreLabel(): the Items view renders 100 rows at a time
   js/router.js  shortcuts.js   hash routes / every SPEC shortcut for the `?` overlay
   js/queue.js           serial mutation queue (fast entry lands in order)
   js/clipboard.js       copy with fallbacks for plain-HTTP phones
@@ -59,7 +68,10 @@ public/                 frontend, served from disk (no build step, no runtime de
                         categories-view.js (row/footer DOM)
   js/*.test.js          node:test unit tests for the DOM-free modules
 e2e/                    Playwright Test (own package.json, uses system Microsoft Edge)
-  playwright.config.ts  global-teardown.ts  tests/fixtures.ts  tests/*.spec.ts
+  playwright.config.ts  global-teardown.ts  tests/fixtures.ts  tests/*.spec.ts (one per view,
+                        plus shell, mobile (375×812 phone session, tap targets, sheets), a11y
+                        (keyboard-only walk, ARIA, offline) and perf (1,200 extra items served
+                        by page.route, so the shared DB is untouched))
 scripts/check.ps1|.sh   every check, in order, stops at first failure
 docs/                   SPEC.md, TASKS.md, API.md
 .claude/launch.json     "dev" preview server: 127.0.0.1:3999, data in target/dev-data, --demo
@@ -114,6 +126,11 @@ itself and stops it afterwards. The temp dir is `%TEMP%/grocery-e2e/run-*` (expo
   `*.test.js` using `node:test` + `node:assert/strict`.
 - `data-testid` on every interactive element and on anything a test asserts on.
 - Keep modules small and single-purpose (split past ~300 lines).
+- Accessibility/mobile (T8 baseline, enforced by `e2e/tests/a11y.spec.ts` and `mobile.spec.ts`):
+  focus never ends on `<body>` (Esc out of a field: `parkFocus()`; an element that disappears
+  while focused: hand focus to a neighbour or `focusFallback()`); row lists get `role="list"`
+  and focusable rows a short `aria-label`; every control has an accessible name; touch targets
+  are ≥ 44 px under `(pointer: coarse)`; muted text keeps ≥ 4.5:1 contrast in both themes.
 
 **E2E**
 - Import `test`/`expect` from `./fixtures` (not `@playwright/test`): it fails any test whose page

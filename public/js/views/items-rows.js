@@ -11,14 +11,15 @@
 import { h, isTypingTarget, rerender } from '../dom.js';
 import { fallbackFocus } from '../list-model.js';
 import { itemKeyAction } from '../items-model.js';
-import { createRow, emptyState, itemRow, noneRow } from './items-row-view.js';
+import { createRow, emptyState, itemRow, moreRow, noneRow } from './items-row-view.js';
 
 const FLASH_MS = 1600;
 
 /**
  * @param {object} deps
  * @param {{edit: (id: number) => void, create: (name: string) => void, staple: (id: number) => void,
- *   category: (id: number) => void, merge: (id: number) => void, delete: (id: number) => void}} deps.on
+ *   category: (id: number) => void, merge: (id: number) => void, delete: (id: number) => void,
+ *   more: () => void}} deps.on
  * @param {(select?: boolean) => void} deps.focusSearch
  */
 export function createItemRows({ on, focusSearch }) {
@@ -30,6 +31,7 @@ export function createItemRows({ on, focusSearch }) {
   const el = h('ul', {
     class: 'rows item-rows',
     id: 'item-list',
+    role: 'list', // list-style: none drops the list role in Safari
     'aria-label': 'Items',
     testid: 'item-list',
     onKeydown,
@@ -41,7 +43,8 @@ export function createItemRows({ on, focusSearch }) {
 
   /**
    * @param {object} view
-   * @param {object[]} view.options   rows: `{key, item, text, ranges, alias}` or `{key: 'create', name}`
+   * @param {object[]} view.options   rows: `{key, item, text, ranges, alias}`, `{key: 'more', more}`
+   *   ("Show more": `more` results not rendered) or `{key: 'create', name}`
    * @param {object} view.state
    * @param {object|null} view.editor the open editor (createItemEditor)
    * @param {string|null} view.activeKey  the highlighted row (Enter in the filter acts on it)
@@ -65,6 +68,7 @@ export function createItemRows({ on, focusSearch }) {
       if (!next.length) return emptyState({ total: state.items.length, query, filters });
       const rows = next.map((o) => {
         const view = { active: o.key === activeKey, tabbable: o.key === cursorKey, flash: flashes.get(o.key), now, on, editor: null };
+        if (o.more) return moreRow(o, view);
         if (!o.item) return createRow(o, view);
         view.editor = editor?.id === o.item.id ? editor : null;
         return itemRow(o, state, view);
@@ -134,6 +138,7 @@ export function createItemRows({ on, focusSearch }) {
         break;
       case 'edit':
         if (option?.item) on.edit(option.item.id);
+        else if (option?.more) on.more();
         else if (option) on.create(option.name);
         break;
       default:

@@ -6,7 +6,7 @@
 // (when not typing) or the "New recipe" button asks for a name. Rows are keyed by recipe id, so
 // focus survives live-sync re-renders. DOM builders: recipes-index-view.js.
 
-import { h, isKeyboardDevice, isTypingTarget, rerender } from '../dom.js';
+import { h, isKeyboardDevice, isTypingTarget, parkFocus, rerender } from '../dom.js';
 import { icon } from '../icons.js';
 import { filterRecipes, recipesSummary } from '../recipes-model.js';
 import { isModalOpen } from '../components/dialog.js';
@@ -52,6 +52,7 @@ export function createRecipesIndex(container, ctx, actions, { focusRecipe = null
   const list = h('ul', {
     class: 'rows recipe-rows',
     id: 'recipe-list',
+    role: 'list', // list-style: none drops the list role in Safari
     'aria-label': 'Recipes',
     testid: 'recipe-list',
     onKeydown: onRowKeydown,
@@ -173,7 +174,7 @@ export function createRecipesIndex(container, ctx, actions, { focusRecipe = null
         input.value = '';
         refresh();
       } else {
-        input.blur();
+        parkFocus();
       }
     }
   }

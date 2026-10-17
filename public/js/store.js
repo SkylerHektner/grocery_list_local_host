@@ -141,15 +141,31 @@ function rethrowLater(err) {
 export const store = createStore();
 
 /**
+ * Delay before the next poll after `failures` failed polls in a row: `interval` while all is
+ * well (and for the first retry), then doubling up to `max` (3 s, 6 s, 12 s, 24 s, 30 s, ...),
+ * so a server that is down (restarting, PC asleep) isn't hit every 3 s for nothing.
+ * @param {number} failures
+ * @param {number} interval
+ * @param {number} max
+ */
+export function retryDelay(failures, interval, max) {
+  if (failures <= 1) return interval;
+  return Math.min(interval * 2 ** (failures - 1), Math.max(max, interval));
+}
+
+/**
  * Live sync: polls `getVersion()` every `interval` ms while `isVisible()`, and fetches
- * `getState()` into the store when the version differs. `wake()` (focus / visibilitychange)
- * checks immediately. Status ('connecting' -> 'live' | 'offline') is reported via `onStatus`.
+ * `getState()` into the store when the version differs. `wake()` (focus / visibilitychange /
+ * online) checks immediately. Status ('connecting' -> 'live' | 'offline') is reported via
+ * `onStatus`. While offline the polls back off (retryDelay(), up to `maxInterval`); the first
+ * successful one goes back to `interval`.
  *
  * @param {object} deps
  * @param {ReturnType<typeof createStore>} deps.store
  * @param {() => Promise<{version: number}>} deps.getVersion
  * @param {() => Promise<object>} deps.getState
  * @param {number} [deps.interval]
+ * @param {number} [deps.maxInterval]  longest wait between polls while offline
  * @param {{setTimeout: Function, clearTimeout: Function}} [deps.timers]
  * @param {() => boolean} [deps.isVisible]
  * @param {(status: string) => void} [deps.onStatus]
@@ -159,6 +175,7 @@ export function createLiveSync({
   getVersion,
   getState,
   interval = 3000,
+  maxInterval = 30000,
   timers = globalThis,
   isVisible = () => true,
   onStatus = () => {},
@@ -167,6 +184,7 @@ export function createLiveSync({
   let timer = null;
   let inFlight = null;
   let status = 'connecting';
+  let failures = 0; // failed polls in a row
 
   function setStatus(next) {
     if (next === status) return;
@@ -185,8 +203,10 @@ export function createLiveSync({
           const baseline = target.version;
           target.set(await getState(), { baseline });
         }
+        failures = 0;
         setStatus('live');
       } catch {
+        failures += 1;
         setStatus('offline');
       } finally {
         inFlight = null;
@@ -204,7 +224,7 @@ export function createLiveSync({
 
   function schedule() {
     clear();
-    if (running && isVisible()) timer = timers.setTimeout(tick, interval);
+    if (running && isVisible()) timer = timers.setTimeout(tick, retryDelay(failures, interval, maxInterval));
   }
 
   async function tick() {
@@ -233,6 +253,10 @@ export function createLiveSync({
     checkNow,
     get status() {
       return status;
+    },
+    /** ms until the next poll is due: `interval`, or longer while offline (retryDelay()). */
+    get nextDelay() {
+      return retryDelay(failures, interval, maxInterval);
     },
   };
 }

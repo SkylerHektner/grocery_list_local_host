@@ -3,7 +3,7 @@
 
 import { h, highlight } from '../dom.js';
 import { categoryOptions, UNCATEGORIZED } from '../omnibar-model.js';
-import { mergeOptions } from '../items-model.js';
+import { MERGE_BLANK_LIMIT, mergeOptions } from '../items-model.js';
 import { openPicker } from '../components/pick-dialog.js';
 
 /**
@@ -55,6 +55,12 @@ export async function pickMergeTarget({ store, item }) {
     placeholder: 'Find the item to keep…',
     testid: 'merge-picker',
     emptyText: 'No other item matches',
+    footnote: (filter, shown) => {
+      const others = store.state.items.length - 1;
+      return !filter.trim() && shown >= MERGE_BLANK_LIMIT && others > shown
+        ? `The first ${shown} of ${others} items: type to find the others.`
+        : null;
+    },
     options: (filter) => {
       const state = store.state;
       const from = state.itemsById.get(item.id) ?? item;

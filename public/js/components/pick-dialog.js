@@ -1,8 +1,9 @@
 // A modal "pick one" list with a filter box: the Items view's category picker (`c`, new items)
 // and merge-target picker. Keys: typing filters, ↑/↓ move the highlight (clamped), Enter picks
-// it, digits pick a numbered option while the filter is empty (like the omnibar's category
-// picker), Esc cancels. Mouse/tap picks too. Keyboard devices focus the filter; touch screens
-// don't (no on-screen keyboard covering the rows); the panel is a bottom sheet on narrow screens.
+// it, digits pick a numbered option while the filter is empty and `Tab` in the filter picks
+// option 0 (Uncategorized; both like the omnibar's category picker), Esc cancels. Mouse/tap
+// picks too. Keyboard devices focus the filter; touch screens don't (no on-screen keyboard
+// covering the rows); the panel is a bottom sheet on narrow screens.
 //
 //   const choice = await openPicker({
 //     title: 'Category for Milk', placeholder: 'Filter categories…', digits: true,
@@ -33,7 +34,10 @@ import { openModal } from './dialog.js';
  * @param {string} [options.testid]          panel; the filter is `-input`, the empty row `-empty`
  * @param {(filter: string) => PickOption[]} options.options
  * @param {boolean|string} [options.digits]  0-9 pick the option with that `number`; a string
- *   names option 0 in the key hints (e.g. 'uncategorized')
+ *   names option 0 in the key hints (e.g. 'uncategorized'); `Tab` in the filter picks option 0
+ *   too (like the omnibar's category picker)
+ * @param {(filter: string, shown: number) => string|null} [options.footnote]  a line under the
+ *   options (e.g. "type to find the rest")
  * @param {string|null} [options.initialKey] highlighted first (else the first option)
  * @param {string} [options.emptyText]
  * @returns {Promise<{value: unknown} | null>}
@@ -47,6 +51,7 @@ export function openPicker({
   digits = false,
   initialKey = null,
   emptyText = 'No matches',
+  footnote,
 }) {
   return new Promise((resolve) => {
     let modal = null;
@@ -73,6 +78,7 @@ export function openPicker({
       onInput: () => refresh(true),
     });
     const listbox = h('ul', { class: 'listbox pick-list', id: listId, role: 'listbox', 'aria-label': title, testid: `${testid}-options` });
+    const note = h('p', { class: 'pick-note', testid: `${testid}-note`, hidden: true });
 
     const done = (result) => {
       modal?.close();
@@ -118,6 +124,9 @@ export function openPicker({
           ? opts.map(row)
           : [h('li', { class: 'option option-empty', role: 'option', 'aria-disabled': 'true', testid: `${testid}-empty` }, emptyText)]),
       );
+      const text = footnote?.(input.value, opts.length) ?? null;
+      note.textContent = text ?? '';
+      note.hidden = !text;
       paint(true);
     }
 
@@ -153,6 +162,12 @@ export function openPicker({
         const option = opts.find((o) => o.number === Number(e.key));
         e.preventDefault();
         if (option) done({ value: option.value });
+      } else if (e.key === 'Tab' && !e.shiftKey && !e.defaultPrevented && digits && e.target === input) {
+        // Like the omnibar's category picker: Tab = option 0 (Uncategorized).
+        const zero = options('').find((o) => o.number === 0);
+        if (!zero) return;
+        e.preventDefault();
+        done({ value: zero.value });
       }
     }
 
@@ -164,6 +179,7 @@ export function openPicker({
         lead && h('p', { class: 'pick-lead', testid: `${testid}-lead` }, lead),
         h('label', { class: 'search pick-search' }, icon('search', { size: 18 }), input),
         listbox,
+        note,
         h(
           'p',
           { class: 'pick-keys only-keys', 'aria-hidden': 'true' },
@@ -171,7 +187,7 @@ export function openPicker({
           ' move ',
           kbd('Enter'),
           ' pick ',
-          digits && [kbd('1–9'), ' by number ', kbd('0'), ` ${digits === true ? 'none' : digits} `],
+          digits && [kbd('1–9'), ' by number ', kbd('0'), digits === true ? ' none ' : [' or ', kbd('Tab'), ` ${digits} `]],
           kbd('Esc'),
           ' cancel',
         ),

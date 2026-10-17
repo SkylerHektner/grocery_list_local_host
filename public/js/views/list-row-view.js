@@ -34,7 +34,7 @@ export function groupView(group, view) {
       h('span', { class: 'group-name' }, group.name),
       h('span', { class: 'group-count', 'aria-label': `${group.rows.length} items` }, group.rows.length),
     ),
-    h('ul', { class: 'rows' }, group.rows.map((r) => rowView(r, view))),
+    h('ul', { class: 'rows', role: 'list' }, group.rows.map((r) => rowView(r, view))),
   );
 }
 
@@ -71,6 +71,7 @@ function rowView({ entry, item, recipes }, view) {
       // Re-renders mid-highlight continue the animation instead of restarting it.
       style: flashed ? { animationDelay: `-${view.now - flashed}ms` } : null,
       tabindex: id === view.cursorId ? '0' : '-1',
+      'aria-label': editing ? null : rowLabel(item, entry, recipes),
       testid: 'list-row',
       dataset: { key: `item-${id}`, itemId: String(id) },
     },
@@ -81,9 +82,15 @@ function rowView({ entry, item, recipes }, view) {
       editing
         ? noteInput(id, item, entry.note, view)
         : entry.note && h('span', { class: 'row-note', testid: 'row-note' }, entry.note),
+      // In the same wrapping line as the name: on a phone the tags drop below a long name
+      // instead of squeezing it into a mid-word break.
+      recipes.length > 0 &&
+        h(
+          'span',
+          { class: 'row-tags' },
+          recipes.map((r) => h('span', { class: 'tag', testid: 'row-source', title: `From ${r.name}` }, r.name)),
+        ),
     ),
-    recipes.length > 0 &&
-      h('span', { class: 'row-tags' }, recipes.map((r) => h('span', { class: 'tag', testid: 'row-source' }, r.name))),
     h(
       'span',
       { class: 'row-actions' },
@@ -100,6 +107,13 @@ function rowView({ entry, item, recipes }, view) {
       button('remove-entry', `remove-${id}`, `Remove ${item.name}`, 'Remove (Delete)', 'close', 18, view.onRemove),
     ),
   );
+}
+
+/** What a screen reader says for a focused row: "Eggs, note: 2 dozen, from Carbonara". */
+function rowLabel(item, entry, recipes) {
+  return [item.name, entry.note && `note: ${entry.note}`, recipes.length && `from ${recipes.map((r) => r.name).join(', ')}`]
+    .filter(Boolean)
+    .join(', ');
 }
 
 function noteInput(id, item, note, view) {

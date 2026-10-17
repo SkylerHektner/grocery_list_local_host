@@ -46,6 +46,7 @@ export function createIngredientRows({ recipeId, store, api, queue, toast, focus
         class: ['row', 'list-row', 'ingredient-row', flashed && 'is-flash'],
         style: flashed ? { animationDelay: `-${now - flashed}ms` } : null,
         tabindex: id === cursorId ? '0' : '-1',
+        'aria-label': staple ? `${item.name}, staple` : item.name,
         testid: 'ingredient-row',
         dataset: { key: `ingredient-${id}`, itemId: String(id) },
       },
@@ -127,7 +128,7 @@ export function createIngredientRows({ recipeId, store, api, queue, toast, focus
                 h('span', { class: 'group-name' }, g.name),
                 h('span', { class: 'group-count' }, g.rows.length),
               ),
-              h('ul', { class: 'rows' }, g.rows.map((r) => row(r, now))),
+              h('ul', { class: 'rows', role: 'list' }, g.rows.map((r) => row(r, now))),
             ),
           )
         : emptyView(),

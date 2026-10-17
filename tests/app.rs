@@ -64,3 +64,51 @@ async fn real_public_dir_has_index() {
     assert_eq!(res.status, StatusCode::OK);
     assert!(res.text().contains("js/main.js"));
 }
+
+#[tokio::test]
+async fn static_files_never_escape_the_static_dir() {
+    // <tmp>/secret.txt next to <tmp>/public/, which is what gets served.
+    let root = tempfile::tempdir().expect("temp dir");
+    let public = root.path().join("public");
+    std::fs::create_dir_all(public.join("js")).unwrap();
+    std::fs::write(
+        public.join("index.html"),
+        "<!doctype html><title>ok</title>",
+    )
+    .unwrap();
+    std::fs::write(public.join("js").join("app.js"), "export {};\n").unwrap();
+    std::fs::write(root.path().join("secret.txt"), "TOP SECRET").unwrap();
+    let app = TestApp::with_static_dir(&public);
+
+    assert_eq!(app.get("/js/app.js").await.status, StatusCode::OK);
+    for uri in [
+        "/../secret.txt",
+        "/js/../../secret.txt",
+        "/%2e%2e/secret.txt",
+        "/%2E%2E/secret.txt",
+        "/..%2fsecret.txt",
+        "/..%2Fsecret.txt",
+        "/js/..%2f..%2fsecret.txt",
+        "/%2e%2e%2fsecret.txt",
+        "/..%5csecret.txt",
+        "/js/..%5c..%5csecret.txt",
+        "/%2e%2e%5csecret.txt",
+        "//secret.txt",
+        "/%2f..%2fsecret.txt",
+        "/js/%2e%2e/%2e%2e/secret.txt",
+    ] {
+        let res = app.get(uri).await;
+        assert_ne!(res.status, StatusCode::OK, "{uri} was served");
+        assert!(
+            !String::from_utf8_lossy(&res.body).contains("TOP SECRET"),
+            "{uri} leaked the file"
+        );
+    }
+    // An absolute path smuggled in (Windows drive / UNC style) is refused too.
+    let secret = root.path().join("secret.txt");
+    let absolute = secret.to_string_lossy().replace('\\', "/");
+    for uri in [format!("/{absolute}"), format!("/js/{absolute}")] {
+        let res = app.get(&uri).await;
+        assert_ne!(res.status, StatusCode::OK, "{uri} was served");
+    }
+}

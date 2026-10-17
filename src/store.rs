@@ -10,6 +10,10 @@
 //! the demo catalog with `--demo`); an existing one is parsed, schema-checked and migrated, then
 //! backed up to `backups/db-<unix_seconds>[-n].json` (newest [`KEEP_BACKUPS`] kept). Unreadable,
 //! corrupt or too-new files are hard errors: the user's data is never silently replaced.
+//!
+//! A server that runs for weeks would only have its startup copy, so while running, the DB as it
+//! is on disk is also backed up before the first change once [`BACKUP_EVERY_SECS`] have passed
+//! since the last backup (a failed backup is reported on stderr and never blocks the change).
 
 use std::collections::VecDeque;
 use std::fmt;
@@ -32,6 +36,9 @@ pub const BACKUP_DIR: &str = "backups";
 pub const KEEP_BACKUPS: usize = 10;
 /// List states kept for `POST /api/list/undo` (SPEC §3.5).
 pub const UNDO_CAP: usize = 50;
+/// While running: back up before the first change once this long has passed since the last
+/// backup (startup or running), so a mistake can be undone from a copy at most a day old.
+pub const BACKUP_EVERY_SECS: u64 = 24 * 60 * 60;
 
 /// Shared app state: cheap to clone (one `Arc`), handed to axum via `Router::with_state`.
 #[derive(Clone)]
@@ -43,6 +50,8 @@ struct Store {
     db: Db,
     data_dir: PathBuf,
     undo: UndoStack,
+    /// Unix seconds of the last backup (startup counts, also for a fresh DB).
+    last_backup: u64,
 }
 
 impl fmt::Debug for AppState {
@@ -181,6 +190,7 @@ impl AppState {
             db,
             data_dir,
             undo: UndoStack::default(),
+            last_backup: unix_now(),
         };
         let state = Self {
             inner: Arc::new(Mutex::new(store)),
@@ -271,9 +281,31 @@ impl AppState {
 }
 
 impl Store {
+    /// Copies the DB as saved (before the change about to be committed) to `backups/` when the
+    /// last backup is [`BACKUP_EVERY_SECS`] old. Never fails the mutation: problems go to stderr.
+    fn backup_if_due(&mut self, now: u64) {
+        if now.saturating_sub(self.last_backup) < BACKUP_EVERY_SECS {
+            return;
+        }
+        self.last_backup = now; // also after a failure: retry in a day, not on every change
+        let dir = self.data_dir.join(BACKUP_DIR);
+        match serialize(&self.db).and_then(|bytes| write_backup(&dir, &bytes, now)) {
+            Ok(_) => {
+                for warning in prune_backups(&dir, KEEP_BACKUPS) {
+                    eprintln!("warning: {warning}");
+                }
+            }
+            Err(e) => eprintln!(
+                "warning: could not write a backup to {}: {e}",
+                dir.display()
+            ),
+        }
+    }
+
     /// Gives `draft` the next version, saves it, and only then swaps it in. Returns the
-    /// previous DB.
+    /// previous DB. Takes the periodic backup first (see [`BACKUP_EVERY_SECS`]).
     fn commit(&mut self, mut draft: Db) -> Result<Db, ApiError> {
+        self.backup_if_due(unix_now());
         draft.version = self.db.version + 1;
         draft.schema_version = SCHEMA_VERSION;
         save(&self.data_dir, &draft).map_err(|e| {
@@ -342,8 +374,7 @@ fn migrate(value: Value, from: u64) -> Result<Value, String> {
 /// (`std::fs::rename` replaces the target on Windows too). On failure `db.json` is untouched
 /// and the temp file is removed.
 fn save(data_dir: &Path, db: &Db) -> io::Result<()> {
-    let mut bytes = serde_json::to_vec_pretty(db)?;
-    bytes.push(b'\n');
+    let bytes = serialize(db)?;
     let tmp = data_dir.join(TMP_FILE);
     let result =
         write_synced(&tmp, &bytes).and_then(|()| rename_retrying(&tmp, &data_dir.join(DB_FILE)));
@@ -351,6 +382,13 @@ fn save(data_dir: &Path, db: &Db) -> io::Result<()> {
         let _ = fs::remove_file(&tmp);
     }
     result
+}
+
+/// `db.json`'s exact bytes for `db`: pretty JSON plus a newline (backups are byte-identical).
+fn serialize(db: &Db) -> io::Result<Vec<u8>> {
+    let mut bytes = serde_json::to_vec_pretty(db)?;
+    bytes.push(b'\n');
+    Ok(bytes)
 }
 
 fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
@@ -701,6 +739,44 @@ mod tests {
         }
         // 13 starts within ~a second: suffixed names, none overwritten, 10 kept.
         assert_eq!(backups(dir.path()).len(), KEEP_BACKUPS);
+    }
+
+    #[test]
+    fn a_running_server_backs_up_before_the_first_change_of_a_new_day() {
+        let dir = TempDir::new().unwrap();
+        let (state, _) = open(dir.path()); // fresh DB: no backup
+        state.mutate(|db| Ok(add_item(db, "Milk"))).unwrap();
+        assert!(backups(dir.path()).is_empty(), "not due yet");
+
+        // A day later (the clock is the last backup's time): the next change first copies the
+        // DB as saved, then goes through.
+        let saved = fs::read(dir.path().join(DB_FILE)).unwrap();
+        state.lock().last_backup -= BACKUP_EVERY_SECS;
+        state.mutate(|db| Ok(add_item(db, "Eggs"))).unwrap();
+        let names = backups(dir.path());
+        assert_eq!(names.len(), 1);
+        let backup = fs::read(dir.path().join(BACKUP_DIR).join(&names[0])).unwrap();
+        assert_eq!(
+            backup, saved,
+            "the backup is the DB before the change, byte for byte"
+        );
+        assert_eq!(db_on_disk(dir.path()).items.len(), 2);
+
+        // Not again on the same day.
+        state.mutate(|db| Ok(add_item(db, "Bread"))).unwrap();
+        assert_eq!(backups(dir.path()).len(), 1);
+    }
+
+    #[test]
+    fn a_failed_running_backup_never_blocks_the_change() {
+        let dir = TempDir::new().unwrap();
+        let (state, _) = open(dir.path());
+        // A *file* named like the backups dir: creating backups/ fails.
+        fs::write(dir.path().join(BACKUP_DIR), b"not a dir").unwrap();
+        state.lock().last_backup = 0;
+        state.mutate(|db| Ok(add_item(db, "Milk"))).unwrap();
+        assert_eq!(db_on_disk(dir.path()).items.len(), 1);
+        assert_eq!(state.version(), 1);
     }
 
     #[test]

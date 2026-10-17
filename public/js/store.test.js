@@ -8,6 +8,7 @@ import {
   createStore,
   derive,
   pollAction,
+  retryDelay,
   walkIndex,
 } from './store.js';
 
@@ -278,6 +279,48 @@ describe('createLiveSync', () => {
     await timers.advance(3000);
     assert.equal(store.version, 1);
     assert.deepEqual(statuses, ['offline', 'live']);
+  });
+
+  test('retryDelay: the normal interval, then doubling while offline, capped', () => {
+    const delays = [0, 1, 2, 3, 4, 5, 6, 50].map((n) => retryDelay(n, 3000, 30000));
+    assert.deepEqual(delays, [3000, 3000, 6000, 12000, 24000, 30000, 30000, 30000]);
+    assert.equal(retryDelay(4, 3000, 1000), 3000, 'the cap never goes below the interval');
+  });
+
+  test('backs off while the server is down; recovers to the 3 s interval', async () => {
+    const { timers, server, store, sync, statuses } = setup();
+    server.down = true;
+    await sync.start();
+    assert.equal(server.versionCalls, 1);
+    // Retries after 3 s, then 6 s, then 12 s: fewer failed requests (and console errors).
+    await timers.advance(3000);
+    assert.equal(server.versionCalls, 2);
+    await timers.advance(3000);
+    assert.equal(server.versionCalls, 2, 'second retry waits 6 s');
+    await timers.advance(3000);
+    assert.equal(server.versionCalls, 3);
+    assert.equal(sync.nextDelay, 12000);
+    await timers.advance(11999);
+    assert.equal(server.versionCalls, 3);
+    server.down = false;
+    await timers.advance(1);
+    assert.equal(server.versionCalls, 4);
+    assert.equal(store.version, 1);
+    assert.deepEqual(statuses, ['offline', 'live']);
+    assert.equal(sync.nextDelay, 3000, 'back to normal polling');
+    await timers.advance(3000);
+    assert.equal(server.versionCalls, 5);
+  });
+
+  test('a wake() while offline checks at once and keeps the backoff going if still down', async () => {
+    const { timers, server, sync } = setup();
+    server.down = true;
+    await sync.start();
+    await timers.advance(3000);
+    await sync.wake();
+    assert.equal(server.versionCalls, 3);
+    assert.equal(sync.nextDelay, 12000);
+    assert.equal(timers.count, 1);
   });
 
   test('concurrent checks share one request', async () => {

@@ -45,6 +45,21 @@ test('the items and store order views list their row keys', () => {
   for (const key of ['Alt+↑', 'Alt+↓', 'F2', 'Delete', 'n']) assert.ok(storeKeys.includes(key), key);
 });
 
+test('both category pickers take Tab for Uncategorized; every row list has Home/End', () => {
+  for (const title of ['New item: pick a category', 'Pick a category']) {
+    const group = SHORTCUT_GROUPS.find((g) => g.title === title);
+    assert.ok(group.items.some((i) => i.keys.includes('Tab') && i.keys.includes('0')), title);
+  }
+  for (const title of ['List', 'Adding a recipe', 'Recipes', 'Recipe editor', 'Items', 'Store order']) {
+    const group = SHORTCUT_GROUPS.find((g) => g.title === title);
+    assert.ok(group.items.some((i) => i.keys.includes('Home') && i.keys.includes('End')), title);
+  }
+  for (const title of ['Items', 'Store order']) {
+    const group = SHORTCUT_GROUPS.find((g) => g.title === title);
+    assert.ok(group.items.some((i) => i.keys.includes('Delete') && i.keys.includes('Backspace')), title);
+  }
+});
+
 test('the recipes view lists its index, editor and cull keys', () => {
   const groups = groupsFor('recipes', 'Recipes');
   assert.deepEqual(groups.slice(1, 6).map((g) => g.title), [
