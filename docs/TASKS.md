@@ -202,7 +202,30 @@ Items placeholder's `count-recipes` stat, so update it when T7 replaces the Item
   with Space, recipe chip removal keeps manually added items.
 
 ## T7 — Items catalog & store order
-- [ ] Done
+- [x] Done
+
+Notes: **Items view** = `views/items.js` (filter + chips, one inline editor at a time) with
+`items-rows.js` (render/focus/row keys via `itemKeyAction`), `items-row-view.js`,
+`items-editor.js` (persistent form element: rerender() moves it, never rebuilds it),
+`items-actions.js` (s/c/m/Delete/create; every mutation queued and reading the latest item) and
+`items-pickers.js`; logic in `items-model.js`. `#/items/uncategorized` presets the chip (Store
+order's "Review" link). **Store order** = `views/categories.js` (+ `categories-view.js`, logic in
+`categories-model.js`): a local `desired` order is rendered while queued reorders land; each
+request sends `reconcileOrder(desired, server ids)`. Reusable: `openPicker()`
+(`components/pick-dialog.js`: filterable modal listbox, digit keys, no autofocus on touch),
+`pickCategory()` (items-pickers.js), CSS `.filter-chip[aria-pressed] .field .field-label
+.field-check`, icons `merge`, `arrow-up/down`, `chevron-down`. `views/placeholder.js` (and its
+`.stats` CSS) is gone; `shell.spec.ts` now watches `items-summary`. E2E: categories tests that
+move demo categories restore the order in `finally` (other specs depend on the demo walk);
+helpers `row`/`names`/`press` (click vs tap) in `categories.spec.ts`, `itemRow`/`filter` in
+`items.spec.ts`. No backend changes were needed. Rough edges for T8: the Items view rebuilds
+every row on each keystroke/sync (fine at ~50 items; check at 1,000+, maybe cap or window the
+blank-filter list); "never added" shows on every unused item (a bit noisy); the pick dialog has
+no `Tab` = Uncategorized like the omnibar picker; switching rows away from a dirty editor is
+refused with a hint rather than offering save; item rows/category rows have no explicit ARIA
+role (plain `li` with roving tabindex); no drag-and-drop reordering; still open from T6: at 375 px
+a long list-entry name next to a recipe tag wraps mid-word. Chromium logs a console error for
+every failed live-sync poll while the server is down (expected, but noisy in the dev console).
 
 - Items view (§3.8) incl. aliases, staple toggle, delete cascade confirm, merge.
 - Categories view (§3.9) incl. keyboard and touch reordering.

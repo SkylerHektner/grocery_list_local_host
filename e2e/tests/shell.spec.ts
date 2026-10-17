@@ -112,17 +112,18 @@ test('live sync: a change made elsewhere shows up on every open page', async ({ 
   await open(page, '#/recipes');
   const other = await context.newPage();
   await open(other, '#/items');
-
-  const count = other.getByTestId('count-recipes');
-  await expect(count).toHaveText(/^\d+$/);
-  const before = Number(await count.textContent());
+  const summary = other.getByTestId('items-summary');
+  await expect(summary).toHaveText(/^\d+ items/);
+  const before = parseInt((await summary.textContent())!, 10);
 
   const name = `Sync probe ${Date.now()}`;
   const res = await request.post('/api/recipes', { data: { name } });
   expect(res.ok()).toBeTruthy();
+  expect((await request.post('/api/items', { data: { name } })).ok()).toBeTruthy();
 
   await expect(page.getByTestId('recipe-name').filter({ hasText: name })).toBeVisible({ timeout: 6000 });
-  await expect(count).toHaveText(String(before + 1), { timeout: 6000 });
+  await expect(other.getByTestId('item-name').filter({ hasText: name })).toBeVisible({ timeout: 6000 });
+  await expect(summary).toHaveText(new RegExp(`^${before + 1} items`));
   await other.close();
 });
 
@@ -131,16 +132,18 @@ test('a mutation updates the page at once; an API error shows the server message
   consoleErrors,
 }) => {
   await open(page, '#/items');
-  const count = page.getByTestId('count-items');
-  await expect(count).toHaveText(/^\d+$/);
-  const before = Number(await count.textContent());
+  const summary = page.getByTestId('items-summary');
+  await expect(summary).toHaveText(/^\d+ items/);
+  const before = parseInt((await summary.textContent())!, 10);
 
   // The mutation response goes straight into the store: no poll needed (well under 3 s).
+  const probe = `Instant probe ${Date.now()}`;
   await inPage(page, `
     const { api } = await import('/js/api.js');
-    await api.createItem({ name: 'Instant probe ' + Date.now() });
+    await api.createItem({ name: ${JSON.stringify(probe)} });
   `);
-  await expect(count).toHaveText(String(before + 1), { timeout: 1000 });
+  await expect(summary).toHaveText(new RegExp(`^${before + 1} items`), { timeout: 1000 });
+  await expect(page.getByTestId('item-name').filter({ hasText: probe })).toBeVisible({ timeout: 1000 });
 
   // "Milk" exists in the demo catalog: 409 with the server's message in an error toast.
   await inPage(page, `

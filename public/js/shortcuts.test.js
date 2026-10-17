@@ -35,6 +35,16 @@ test('extra view shortcuts join the view group once, without mutating the data',
   assert.equal(JSON.stringify(SHORTCUT_GROUPS), before);
 });
 
+test('the items and store order views list their row keys', () => {
+  const items = groupsFor('items', 'Items');
+  assert.deepEqual(items.slice(1, 3).map((g) => g.title), ['Items', 'Pick a category']);
+  const itemKeys = items[1].items.flatMap((i) => i.keys);
+  for (const key of ['s', 'c', 'm', 'Delete', 'F2', 'Enter']) assert.ok(itemKeys.includes(key), key);
+  const store = groupsFor('categories', 'Store order')[1];
+  const storeKeys = store.items.flatMap((i) => i.keys);
+  for (const key of ['Alt+↑', 'Alt+↓', 'F2', 'Delete', 'n']) assert.ok(storeKeys.includes(key), key);
+});
+
 test('the recipes view lists its index, editor and cull keys', () => {
   const groups = groupsFor('recipes', 'Recipes');
   assert.deepEqual(groups.slice(1, 6).map((g) => g.title), [

@@ -7,7 +7,8 @@
                 .only-keys / .only-touch (hidden on touch screens / on keyboard devices)
      omnibar    .omnibar .omnibar-pop .omnibar-head .omnibar-options .omnibar-foot (omnibar.js)
      controls   .btn (+ .btn-primary .btn-ghost .btn-danger .btn-icon .btn-sm) .input .search
-                (.search-input .search-hint) .checkbox
+                (.search-input .search-hint) .checkbox .filter-chip[aria-pressed]
+                .field (.field-label) .field-check .field-error
      lists      .listbox > .option (.is-active / [aria-selected="true"], .option-label,
                 .option-alias, .option-meta, .option-category, .option-create, .option-empty)
                 .group-header (.group-count) .rows > .row (.row-name .row-note .row-tags
@@ -642,10 +643,6 @@ textarea {
   box-shadow: var(--focus-ring);
 }
 
-.search-wrap {
-  position: relative;
-}
-
 .search {
   display: flex;
   align-items: center;
@@ -705,10 +702,6 @@ textarea {
   .search .search-hint {
     display: none; /* no "/" key to press on a phone (beats .kbd's display below) */
   }
-}
-
-.search-results {
-  margin-top: var(--space-2);
 }
 
 .checkbox {
@@ -1020,7 +1013,7 @@ mark {
   font-size: var(--text-xs);
 }
 
-/* ── Empty states & stats ───────────────────────────────────────────────────────────────── */
+/* ── Empty states ───────────────────────────────────────────────────────────────────────── */
 
 .empty {
   display: flex;
@@ -1064,48 +1057,6 @@ mark {
   max-width: 38ch;
   color: var(--ink-2);
   text-wrap: pretty;
-}
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  width: 100%;
-  max-width: 520px;
-  margin: var(--space-5) 0 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.stat {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 2px;
-  padding: var(--space-3) var(--space-2);
-}
-
-.stat + .stat {
-  border-inline-start: 1px solid var(--line);
-}
-
-.stat dt {
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-
-.stat dd {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.empty-foot {
-  margin-top: var(--space-3);
-  color: var(--ink-3);
-  font-size: var(--text-xs);
 }
 
 /* ── Toasts ─────────────────────────────────────────────────────────────────────────────── */
@@ -2188,6 +2139,632 @@ code {
   }
 }
 
+/* ── Items (views/items*.js) ────────────────────────────────────────────────────────────── */
+
+.items-view,
+.categories-view {
+  gap: var(--space-3);
+}
+
+/* Title and "New category" side by side, also on phones; the lead goes underneath. */
+.categories-head {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-chips-label {
+  margin-inline-end: 2px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 5px 0 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.filter-chip:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.filter-chip-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.filter-chip.needs-attention .filter-chip-count {
+  background: var(--warm-soft);
+  color: var(--warm);
+}
+
+.filter-chip[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.filter-chip[aria-pressed="true"] .filter-chip-count {
+  background: var(--accent-soft-2);
+  color: var(--accent-text);
+}
+
+.items-card,
+.categories-card {
+  padding: var(--space-1);
+}
+
+.item-rows,
+.category-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.item-row {
+  position: relative;
+  min-height: 52px;
+  padding-block: 2px;
+  scroll-margin-top: calc(var(--search-h) + var(--space-6));
+  scroll-margin-bottom: calc(var(--bottom-nav-h) + var(--space-5));
+}
+
+.item-row:focus,
+.category-row:focus {
+  outline: none;
+}
+
+.item-row:focus-visible,
+.category-row:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--focus);
+}
+
+/* Uncategorized items carry a warm bar, so they stand out to be fixed; the active row's accent
+   bar (Enter in the filter acts on it) is drawn over it. */
+.item-row.is-uncategorized::after,
+.item-row.is-active::before {
+  content: "";
+  position: absolute;
+  inset-block: 10px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--warm);
+}
+
+.item-row.is-active::before {
+  z-index: 1;
+  background: var(--accent);
+}
+
+.item-row-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding-block: 4px;
+  cursor: pointer;
+}
+
+.item-row-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--space-2);
+  min-width: 0;
+  font-weight: 600;
+}
+
+.item-name {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.item-row-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+.item-aliases {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.item-aliases + .item-usage::before {
+  content: "·";
+  margin-inline-end: 6px;
+}
+
+.item-row-hint {
+  display: none;
+  flex: none;
+}
+
+.item-row.is-active .item-row-hint {
+  display: inline-grid;
+}
+
+.item-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  width: 11.5rem;
+  min-height: var(--control-h-sm);
+  padding: 0 8px 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  text-align: start;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.item-category:hover {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.item-category-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-category .icon {
+  color: var(--ink-3);
+}
+
+.item-category .icon-chevron-down {
+  opacity: 0.6;
+}
+
+.item-category:hover .icon-chevron-down {
+  opacity: 1;
+}
+
+.item-category.is-uncategorized {
+  background: var(--warm-soft);
+  color: var(--warm);
+  font-style: italic;
+  font-weight: 600;
+}
+
+.item-category.is-uncategorized .icon {
+  color: currentColor;
+}
+
+.item-edit-btn {
+  color: var(--ink-3);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+
+.item-row:hover .item-edit-btn,
+.item-row:focus .item-edit-btn,
+.item-row:focus-within .item-edit-btn {
+  opacity: 1;
+}
+
+.item-create {
+  min-height: var(--row-h);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+
+.item-create .item-row-title > .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.item-create q {
+  color: var(--ink);
+}
+
+.items-none {
+  padding: 10px 12px 4px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+.items-empty,
+.categories-empty {
+  padding: var(--space-6) var(--space-4) var(--space-5);
+}
+
+/* The inline editor (views/items-editor.js) replaces the row's content. */
+.item-row.is-editing {
+  margin-block: var(--space-1);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+}
+
+.item-row.is-editing:hover {
+  background: var(--surface-2);
+}
+
+.item-row.is-editing::after {
+  display: none;
+}
+
+.item-editor {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.item-editor-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field-label {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.field-aliases {
+  grid-column: 1 / -1;
+}
+
+.item-editor .input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.item-select {
+  padding-inline: 8px;
+  cursor: pointer;
+}
+
+.field-check {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-h-sm);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.item-editor .field-error {
+  margin-top: calc(-1 * var(--space-1));
+}
+
+.item-editor-actions,
+.item-editor-more,
+.item-editor-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.item-editor-more {
+  margin-inline-start: -10px;
+}
+
+.item-editor-done {
+  margin-inline-start: auto;
+}
+
+.item-editor-keys,
+.pick-keys,
+.category-keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+
+.item-editor-keys .kbd,
+.pick-keys .kbd,
+.category-keys .kbd {
+  height: 19px;
+  min-width: 19px;
+  padding: 0 5px;
+  font-size: 0.625rem;
+}
+
+.item-editor-keys {
+  margin-inline-end: var(--space-1);
+}
+
+/* ── Store order (views/categories*.js) ─────────────────────────────────────────────────── */
+
+/* Each row is a stop on the walk: numbered circles joined by a line. */
+.category-row {
+  position: relative;
+  min-height: 52px;
+  padding: 3px 4px 3px 10px;
+  cursor: default;
+  scroll-margin-bottom: calc(var(--bottom-nav-h) + var(--space-5));
+}
+
+.category-row::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 22px;
+  width: 2px;
+  background: var(--line);
+}
+
+.category-row:first-child::before {
+  top: 50%;
+}
+
+.category-row:last-child::before {
+  bottom: 50%;
+}
+
+.category-row:only-child::before {
+  display: none;
+}
+
+.category-num {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--line-2);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.category-row:focus-visible .category-num,
+.category-row.is-flash .category-num {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.category-main {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 10px;
+  min-width: 0;
+  padding-block: 6px;
+  cursor: pointer;
+}
+
+.category-name {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.category-count {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.category-count.is-empty {
+  font-style: italic;
+}
+
+.category-actions .btn-icon {
+  color: var(--ink-3);
+}
+
+.category-actions .btn-icon:hover {
+  color: var(--ink);
+}
+
+.category-actions .row-remove:hover {
+  color: var(--danger);
+}
+
+.category-actions .btn[aria-disabled="true"] {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.category-actions .btn[aria-disabled="true"]:hover {
+  background: transparent;
+}
+
+.category-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  margin-top: var(--space-1);
+  padding: 4px 4px 4px 10px;
+  border-top: 1px dashed var(--line-2);
+}
+
+.category-num.is-none {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--warm) 45%, transparent);
+  background: var(--warm-soft);
+  color: var(--warm);
+}
+
+.category-foot .category-main {
+  cursor: default;
+}
+
+.category-foot .category-name {
+  color: var(--warm);
+  font-style: italic;
+}
+
+.category-review {
+  flex: none;
+  color: var(--accent-text);
+}
+
+.category-review .icon {
+  margin-inline-end: -4px;
+}
+
+.category-keys {
+  justify-content: center;
+}
+
+.category-keys .kbd + .kbd {
+  margin-inline-start: 2px;
+}
+
+/* ── Pick dialog (components/pick-dialog.js) ────────────────────────────────────────────── */
+
+.pick-modal {
+  width: min(460px, 100%);
+}
+
+.pick-modal .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow: hidden;
+}
+
+.pick-lead {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.pick-search {
+  flex: none;
+  height: 44px;
+  box-shadow: none;
+}
+
+.pick-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(56vh, 480px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-shadow: none;
+}
+
+.pick-keys {
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.pick-modal .modal-actions {
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 700px) {
+  .item-category {
+    width: auto;
+    max-width: 9.5rem;
+  }
+
+  /* The warm pill and bar flag it already; room for the name. Tapping the row edits. */
+  .item-category .icon-alert,
+  .item-edit-btn {
+    display: none;
+  }
+
+  .item-editor-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .item-row.is-editing {
+    padding: var(--space-3);
+  }
+
+  .item-editor-done {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .pick-list {
+    max-height: none;
+  }
+
+  .pick-modal .modal-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (hover: none) {
+  .item-edit-btn {
+    opacity: 1;
+  }
+
+  .category-rename {
+    display: none; /* tapping the row renames */
+  }
+}
+
 /* Content only for keyboards / only for touch screens. */
 .only-touch {
   display: none;
@@ -2288,18 +2865,6 @@ code {
     font-size: var(--text-xl);
   }
 
-  .stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .stat:nth-child(3) {
-    border-inline-start: 0;
-  }
-
-  .stat:nth-child(n + 3) {
-    border-top: 1px solid var(--line);
-  }
-
   .modal-layer {
     place-items: end stretch;
     padding: 0;
@@ -2353,7 +2918,9 @@ code {
 /* Touch: every control at least 44px tall/wide. */
 @media (pointer: coarse) {
   .btn-sm,
-  .chip {
+  .chip,
+  .filter-chip,
+  .item-category {
     min-height: 44px;
   }
 

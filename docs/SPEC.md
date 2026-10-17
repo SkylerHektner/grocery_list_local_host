@@ -318,21 +318,47 @@ editor at `#/recipes/<id>`. Picking a recipe opens the cull dialog (§3.4).
 
 ### 3.8 Items catalog view (P1)
 
-- Fuzzy-filterable table of all items: name, category, aliases, staple flag, usage count.
-- Inline edit of name, category (select), aliases (comma-separated), staple toggle.
-- Delete with confirmation that names affected recipes; deletion removes the item from recipes
-  and the list.
-- Uncategorized items are highlighted so they can be fixed later.
+- Fuzzy-filterable table of all items: name, category, aliases, staple flag, usage count
+  ("added 4×"), plus an "on list" tag. Sorted by name while the filter is empty. Quick-filter
+  chips "Uncategorized" and "Staples" (with counts; both on = both conditions); `#/items/
+  uncategorized` opens with the first one on (the Store order view links there).
+- Inline edit of name, category (select), aliases (comma-separated), staple toggle. One editor
+  at a time (switching away from an edited, unsaved one is refused with a hint); `Enter` saves,
+  `Esc` cancels; the server's validation message shows inline on the field it is about (a name
+  vs. an alias conflict). Live sync never touches the open editor's fields or the filter text;
+  the row being edited stays visible even if the filter stops matching it. On phones a tapped
+  row opens the editor without focusing a field (no on-screen keyboard over it).
+- Keyboard: typing filters; `Enter` in the filter edits the top match; `↓` moves into the rows;
+  on a row `↑`/`↓`/`j`/`k`/`Home`/`End` move (`↑` on the first returns to the filter), `Enter`/
+  `F2` edit, `s` toggles staple, `c` opens a category picker (`1`–`9` by walk position, `0`
+  Uncategorized, typing filters, `Enter` picks), `m` merges, `Delete`/`Backspace` delete, `/`
+  or `Esc` back to the filter. Each row also has a category button (opens the picker) and the
+  editor has "Merge into…" and "Delete" buttons, for touch.
+- Whenever the filter text does not name an item (or alias) exactly, the rows end with
+  `+ New item "…"` (on top when nothing matches): it asks for the category with the same
+  picker, creates the item (not on the list) and focuses its row.
+- Delete with confirmation that names affected recipes (and says whether it is on the list);
+  deletion removes the item from recipes and the list.
+- Uncategorized items are highlighted (warm bar and category pill) so they can be fixed later;
+  fixing one under the Uncategorized chip moves focus to the next.
 - **Merge** (P2): merge item A into B — references move to B, A's name becomes an alias of B.
   Details: A's aliases become B's too; on the list, entries fold together (sources unioned, B's
   note kept unless it has none); recipes containing both keep B once; B adopts A's category only
   if uncategorized; usage counts are summed (`last_used` = later); B's name and staple flag stay.
+  UI: a fuzzy picker of the other items, then a confirm explaining the result ("Parmesan will
+  become an alias of Parmigiano Reggiano; 2 recipes updated. …").
 
 ### 3.9 Categories / store order view (P1)
 
-- Ordered list of categories = store walk.
-- Reorder with `Alt+↑`/`Alt+↓` on the focused row, and ↑/↓ buttons for touch.
-- Add, rename, delete (items in a deleted category become Uncategorized; confirm first).
+- Ordered list of categories = store walk: numbered stops with their item counts, and a footer
+  for Uncategorized (always last; "Review" opens `#/items/uncategorized`).
+- Reorder with `Alt+↑`/`Alt+↓` on the focused row (focus follows it), and ↑/↓ buttons for
+  touch (≥ 44 px). Moves show at once; requests run one at a time, each sending the latest
+  order (reconciled with categories added/deleted meanwhile), so holding `Alt+↓` never races.
+- `↑`/`↓`/`j`/`k`/`Home`/`End` move focus (keyboard devices start on the first row).
+- Add (`n` or the button), rename (`Enter`/`F2`, or tap the row: name dialog, server errors
+  inline), delete (`Delete`/`Backspace` or the trash button; the confirm says how many items
+  become Uncategorized).
 
 ### 3.10 Live sync across devices (P1)
 
@@ -434,9 +460,11 @@ public/
   js/dom.js           h() element builder, highlight(), focus-preserving rerender()
   js/queue.js         serial mutation queue; js/clipboard.js: copy with fallbacks
   js/omnibar-model.js js/list-model.js js/recipes-model.js js/cull-model.js
-                      pure logic behind the omnibar, the list, the recipes view, the cull dialog
-  js/components/      omnibar (+ category picker), cull dialog, name dialog, toast, dialog,
-                      copy dialog, sticky bar
+  js/items-model.js js/categories-model.js
+                      pure logic behind the omnibar, the list, the recipes view, the cull
+                      dialog, the items view, the store order view
+  js/components/      omnibar (+ category picker), cull dialog, name dialog, pick dialog,
+                      toast, dialog, copy dialog, sticky bar
   js/views/           list (+ list-*.js), recipes (+ recipes-index*.js, recipe-*.js), items,
                       categories
 e2e/                  Playwright (own package.json; dev-only)

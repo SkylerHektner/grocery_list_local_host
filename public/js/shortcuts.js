@@ -87,9 +87,41 @@ export const SHORTCUT_GROUPS = [
     ],
   },
   {
+    title: 'Items',
+    views: ['items'],
+    items: [
+      { keys: ['Enter'], label: 'In the filter: edit the top match, or create the typed name' },
+      { keys: ['↓'], label: 'From the filter: move into the items' },
+      { keys: ['↑', '↓', 'j', 'k'], label: 'Move between items (↑ on the first: back to the filter)' },
+      { keys: ['Enter', 'F2'], label: 'Edit the item (Enter saves, Esc cancels)' },
+      { keys: ['s'], label: 'Staple on / off' },
+      { keys: ['c'], label: 'Change the category' },
+      { keys: ['m'], label: 'Merge into another item' },
+      { keys: ['Delete'], label: 'Delete the item' },
+      { keys: ['/', 'Esc'], label: 'Back to the filter' },
+    ],
+  },
+  {
+    title: 'Pick a category',
+    views: ['items'],
+    items: [
+      { keys: ['1–9'], label: 'Pick a numbered category' },
+      { keys: ['0'], label: 'Uncategorized' },
+      { keys: ['↑', '↓'], label: 'Move the highlight (typing filters)' },
+      { keys: ['Enter'], label: 'Pick the highlighted one' },
+      { keys: ['Esc'], label: 'Cancel' },
+    ],
+  },
+  {
     title: 'Store order',
     views: ['categories'],
-    items: [{ keys: ['Alt+↑', 'Alt+↓'], label: 'Move the category up or down the walk' }],
+    items: [
+      { keys: ['↑', '↓', 'j', 'k'], label: 'Move between categories' },
+      { keys: ['Alt+↑', 'Alt+↓'], label: 'Move the category up or down the walk' },
+      { keys: ['Enter', 'F2'], label: 'Rename the category' },
+      { keys: ['Delete'], label: 'Delete the category (its items become Uncategorized)' },
+      { keys: ['n'], label: 'New category' },
+    ],
   },
 ];
 
