@@ -17,11 +17,17 @@ src/model.rs            serde types (Db, Item, ..., Snapshot, MutationResponse) 
 src/names.rs            name/alias/note normalization + validation
 src/store.rs            AppState: open/backup/migrate, mutate(|db| ..) = atomic save, list undo
 src/demo.rs             --demo catalog (item/recipe names documented at the top)
-src/error.rs            ApiError (-> {"error": msg}) and ApiJson<T> body extractor
+src/error.rs            ApiError (-> {"error": msg}), ApiJson<T> body + ApiPath<T> path extractors
+src/catalog.rs          Db methods: category/item/recipe create/update/delete, reorder, item merge
+src/list.rs             Db methods: list add/remove item or recipe, note, clear (+ usage bumps)
+src/export.rs           render(&Db) -> the plain-text export (SPEC 3.6)
 src/api/mod.rs          /api router + JSON 404/405 fallbacks; one submodule per resource
 src/api/meta.rs         GET /api/health, /api/state, /api/version
-tests/*.rs              integration tests: oneshot requests against app()
-tests/common/mod.rs     TestApp::new()/demo() (temp data dir) with get/post/put/delete -> TestResponse
+src/api/{categories,items,recipes,list}.rs   thin handlers for the rest of SPEC 4
+tests/*.rs              integration tests: oneshot requests against app() (one file per resource)
+tests/common/mod.rs     TestApp::new()/demo() (temp data dir): get/post/put/delete -> TestResponse,
+                        post_ok/put_ok/delete_ok (asserts success + consistency), post_err/...
+                        (asserts status + nothing changed), restart()
 public/                 frontend, served from disk (no build step, no runtime deps)
   index.html  css/app.css  js/main.js  js/fuzzy.js  js/*.test.js
 e2e/                    Playwright Test (own package.json, uses system Microsoft Edge)

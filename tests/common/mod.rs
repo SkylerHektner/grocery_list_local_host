@@ -7,6 +7,11 @@
 //! assert_eq!(res.status, StatusCode::OK);
 //! let milk = app.item_id("Milk");
 //! app.assert_consistent();
+//!
+//! // Mutations that must succeed (200, version +1, state == store, consistent + saved):
+//! let body = app.post_ok("/api/list/items", json!({ "item_id": milk })).await;
+//! // ... or fail with a status and change nothing (memory, disk, undo depth):
+//! let msg = app.post_err("/api/list/items", json!({ "item_id": 999 }), 404).await;
 //! ```
 #![allow(dead_code)] // each test crate uses a different subset
 
@@ -17,8 +22,8 @@ use axum::body::Body;
 use axum::http::{HeaderMap, Method, Request, StatusCode};
 use http_body_util::BodyExt;
 use rust_html_server::AppState;
-use rust_html_server::model::{Db, Id};
-use serde_json::Value;
+use rust_html_server::model::{Db, Id, ListEntry, Snapshot};
+use serde_json::{Value, json};
 use tempfile::TempDir;
 use tower::ServiceExt;
 
@@ -155,6 +160,144 @@ impl TestApp {
 
     pub async fn delete(&self, uri: &str) -> TestResponse {
         self.send(Method::DELETE, uri, None).await
+    }
+
+    /// Sends a mutation that must succeed and returns its JSON body. Asserts: 200, the body is
+    /// `{state, id}` with `state.version` one higher than before and equal to the store's
+    /// snapshot, and the DB is consistent and saved (`assert_consistent`).
+    pub async fn ok(&self, method: Method, uri: &str, body: Option<Value>) -> Value {
+        let before = self.state.version();
+        let res = self.send(method.clone(), uri, body).await;
+        assert_eq!(
+            res.status,
+            StatusCode::OK,
+            "{method} {uri} failed: {}",
+            res.text()
+        );
+        let json = res.json();
+        let keys: Vec<&String> = json.as_object().expect("object body").keys().collect();
+        assert_eq!(keys, ["id", "state"], "{method} {uri}: mutation body shape");
+        assert_eq!(
+            json["state"]["version"],
+            before + 1,
+            "{method} {uri}: version"
+        );
+        let snapshot: Snapshot = serde_json::from_value(json["state"].clone()).unwrap();
+        assert_eq!(snapshot, self.state.snapshot(), "{method} {uri}: state");
+        self.assert_consistent();
+        json
+    }
+
+    pub async fn post_ok(&self, uri: &str, body: Value) -> Value {
+        self.ok(Method::POST, uri, Some(body)).await
+    }
+
+    pub async fn put_ok(&self, uri: &str, body: Value) -> Value {
+        self.ok(Method::PUT, uri, Some(body)).await
+    }
+
+    pub async fn delete_ok(&self, uri: &str) -> Value {
+        self.ok(Method::DELETE, uri, None).await
+    }
+
+    /// Sends a request that must fail with `status` and change nothing: same DB in memory and
+    /// on disk (so no version bump), same undo depth. Returns the error message.
+    pub async fn fails(
+        &self,
+        method: Method,
+        uri: &str,
+        body: Option<Value>,
+        status: u16,
+    ) -> String {
+        let before = self.db();
+        let disk = std::fs::read(self.data_dir().join("db.json")).expect("read db.json");
+        let undo = self.state.undo_depth();
+        let res = self.send(method.clone(), uri, body).await;
+        assert_eq!(
+            res.status.as_u16(),
+            status,
+            "{method} {uri}: {}",
+            res.text()
+        );
+        assert!(res.content_type().starts_with("application/json"));
+        assert_eq!(self.db(), before, "{method} {uri} changed the DB");
+        let disk_after = std::fs::read(self.data_dir().join("db.json")).unwrap();
+        assert!(disk_after == disk, "{method} {uri} rewrote db.json");
+        assert_eq!(self.state.undo_depth(), undo, "{method} {uri}: undo depth");
+        res.error()
+    }
+
+    pub async fn post_err(&self, uri: &str, body: Value, status: u16) -> String {
+        self.fails(Method::POST, uri, Some(body), status).await
+    }
+
+    pub async fn put_err(&self, uri: &str, body: Value, status: u16) -> String {
+        self.fails(Method::PUT, uri, Some(body), status).await
+    }
+
+    pub async fn delete_err(&self, uri: &str, status: u16) -> String {
+        self.fails(Method::DELETE, uri, None, status).await
+    }
+
+    // --- shortcuts for common setup (each goes through the HTTP API) ---
+
+    /// `POST /api/list/items` for the item named `name`; returns its id.
+    pub async fn add_to_list(&self, name: &str) -> Id {
+        let id = self.item_id(name);
+        self.post_ok("/api/list/items", json!({ "item_id": id }))
+            .await;
+        id
+    }
+
+    /// `POST /api/list/recipes` with the named recipe and the named subset of its items.
+    pub async fn add_recipe_to_list(&self, recipe: &str, items: &[&str]) -> Id {
+        let id = self.recipe_id(recipe);
+        let item_ids: Vec<Id> = items.iter().map(|n| self.item_id(n)).collect();
+        self.post_ok(
+            "/api/list/recipes",
+            json!({ "recipe_id": id, "item_ids": item_ids }),
+        )
+        .await;
+        id
+    }
+
+    /// `POST /api/items` with just a name (and optional category name); returns the new id.
+    pub async fn create_item(&self, name: &str, category: Option<&str>) -> Id {
+        let category_id = category.map(|c| self.category_id(c));
+        let res = self
+            .post_ok(
+                "/api/items",
+                json!({ "name": name, "category_id": category_id }),
+            )
+            .await;
+        res["id"].as_u64().expect("created id")
+    }
+
+    /// The list entry of `item_id`, if on the list.
+    pub fn entry(&self, item_id: Id) -> Option<ListEntry> {
+        self.state.read(|db| db.list_entry(item_id).cloned())
+    }
+
+    /// `(use_count, last_used)` of the item.
+    pub fn usage(&self, item_id: Id) -> (u64, u64) {
+        self.state.read(|db| {
+            let item = db.find_item(item_id).expect("item exists");
+            (item.use_count, item.last_used)
+        })
+    }
+
+    /// Item ids on the list, in list order.
+    pub fn listed(&self) -> Vec<Id> {
+        self.state
+            .read(|db| db.list.entries.iter().map(|e| e.item_id).collect())
+    }
+
+    /// `GET /api/list/export` body (asserting 200 + `text/plain; charset=utf-8`).
+    pub async fn export(&self) -> String {
+        let res = self.get("/api/list/export").await;
+        assert_eq!(res.status, StatusCode::OK);
+        assert_eq!(res.content_type(), "text/plain; charset=utf-8");
+        res.text()
     }
 
     /// A copy of the in-memory DB.

@@ -70,7 +70,21 @@ implements undo (409 "nothing to undo"). Reads: `state.read(|db| ..)`. Bodies: `
   unknown-newer-schema error.
 
 ## T3 — Backend API
-- [ ] Done
+- [x] Done
+
+Notes: All of SPEC §4 is live; `docs/API.md` is the per-endpoint reference. Every mutation
+returns `{state, id}` — just replace client state with `state` (version bumps on every success,
+even no-ops). Bodies are strict: unknown fields are 400, `PUT /api/items/{id}` needs all four
+fields (`category_id` may be `null`), `PUT /api/list/items/{id}` needs `note` (`null`/`""`
+clears). Creating an item or recipe does not touch the list: the new-item flow is
+`POST /api/items` then `POST /api/list/items` (or `PUT /api/recipes/{id}` in the editor).
+Re-adding an item already on the list is a 200, so decide "already on list" toasts client-side
+before the call. `POST /api/list/recipes` needs `item_ids` ⊆ the recipe's ingredients (400
+otherwise) and adds the chip even when empty. Removing entries never removes chips. "Not on the
+list" is a 404 (likely a stale client: refetch `/api/state`). Undo: 409 `"nothing to undo"`;
+only list edits that changed the list are recorded; item delete/merge, recipe delete and server
+restarts clear it; undo restores the list only. Logic lives in `src/catalog.rs`,
+`src/list.rs`, `src/export.rs`; test helpers `post_ok`/`post_err`/... in `tests/common`.
 
 - Every endpoint in SPEC §4 (merge included), including list undo (50-state in-memory stack) and
   export text per SPEC §3.6.

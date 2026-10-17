@@ -2,9 +2,12 @@
 //! integration tests in `tests/` drive it in-process with `tower::ServiceExt::oneshot`.
 
 pub mod api;
+pub mod catalog;
 pub mod config;
 pub mod demo;
 pub mod error;
+pub mod export;
+pub mod list;
 pub mod model;
 pub mod names;
 pub mod store;
@@ -19,7 +22,7 @@ use axum::routing::any;
 use tower_http::services::ServeDir;
 
 pub use config::AppConfig;
-pub use error::{ApiError, ApiJson};
+pub use error::{ApiError, ApiJson, ApiPath};
 pub use store::AppState;
 
 /// Builds the app around an opened store: JSON API under `/api`, static files from `static_dir`

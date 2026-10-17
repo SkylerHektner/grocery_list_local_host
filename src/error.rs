@@ -1,12 +1,14 @@
 //! [`ApiError`]: every API failure, rendered as `{"error": "<message>"}` with a fitting status
-//! (SPEC §4), plus [`ApiJson`], a `Json` extractor whose rejections use the same shape.
+//! (SPEC §4), plus [`ApiJson`] and [`ApiPath`], `Json`/`Path` extractors whose rejections use
+//! the same shape.
 
 use std::fmt;
 
 use axum::Json;
-use axum::extract::rejection::JsonRejection;
-use axum::extract::{FromRequest, Request};
+use axum::extract::rejection::{JsonRejection, PathRejection};
+use axum::extract::{FromRequest, FromRequestParts, Path, Request};
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
 use serde::de::DeserializeOwned;
 use serde_json::json;
@@ -89,6 +91,17 @@ impl From<JsonRejection> for ApiError {
     }
 }
 
+/// A malformed path parameter (e.g. `/api/items/abc`) is a 400.
+impl From<PathRejection> for ApiError {
+    fn from(rejection: PathRejection) -> Self {
+        if rejection.status().is_server_error() {
+            Self::Internal(rejection.body_text())
+        } else {
+            Self::BadRequest(rejection.body_text())
+        }
+    }
+}
+
 /// Drop-in for `axum::Json<T>` as an extractor: a bad body becomes an [`ApiError::BadRequest`]
 /// (`{"error": ...}`, 400) instead of axum's plain-text 400/415/422.
 #[derive(Debug, Clone, Copy, Default)]
@@ -103,6 +116,24 @@ where
 
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
         let Json(value) = Json::<T>::from_request(req, state).await?;
+        Ok(Self(value))
+    }
+}
+
+/// Drop-in for `axum::extract::Path<T>`: a path parameter that doesn't parse (`/api/items/abc`)
+/// becomes an [`ApiError::BadRequest`] (`{"error": ...}`, 400) instead of axum's plain text.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ApiPath<T>(pub T);
+
+impl<S, T> FromRequestParts<S> for ApiPath<T>
+where
+    T: DeserializeOwned + Send,
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let Path(value) = Path::<T>::from_request_parts(parts, state).await?;
         Ok(Self(value))
     }
 }

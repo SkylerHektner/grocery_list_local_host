@@ -122,6 +122,9 @@ editor for adding ingredients.
   `Enter` starts creation. `Shift+Enter` always jumps straight to creation.
 - Re-adding an item already on the list is a no-op apart from adding the manual source / updating
   the note when one is given; it shows a subtle "already on list" toast, never an error.
+- Usage stats (`use_count` +1, `last_used` = now) count the times an item is *put on* the list:
+  a manual add bumps them when it creates the entry or gives a recipe-only entry its manual
+  source; a recipe add bumps only the items it newly puts on the list. Re-adds never count twice.
 
 ### 3.2 New item flow (P0)
 
@@ -161,6 +164,8 @@ Adding a recipe opens the **cull dialog** listing its ingredients as checkboxes:
 - Default checked, **except** staples (unchecked, tagged "staple").
 - Items already on the list are tagged "on list"; confirming with them checked just adds the
   recipe as an extra source (never duplicates).
+- Confirming with nothing checked still adds the recipe chip (the user saw the recipe and culled
+  everything); adding a recipe that is already on the list extends it.
 - Keyboard: `↑`/`↓` move, `Space` toggles, `a` toggles all, `Enter` confirms, `Esc` cancels.
 - The dialog shows a live "Adding N of M" count.
 - Mobile: full-screen sheet with large checkboxes and a sticky confirm button.
@@ -172,12 +177,16 @@ Adding a recipe opens the **cull dialog** listing its ingredients as checkboxes:
   (always visible — no hover-only controls).
 - "Recipes on this list" chips at the top; removing a chip removes the recipe source from all
   entries and removes entries left with no source (items also added manually or by another
-  recipe stay).
+  recipe stay). Removing an entry removes it whatever its sources; chips stay even when no entry
+  from that recipe is left (only removing the chip, clearing, or deleting the recipe drops it).
+  Editing a recipe's ingredients doesn't change the list.
 - **Keyboard list navigation:** `↓` from an empty omnibar moves focus into the list; `↑`/`↓`/`j`/`k`
   move; `Delete`/`Backspace`/`x` removes; `Enter`/`n` edits the note (`Enter` saves, `Esc`
   cancels); `/` or `Esc` returns to the omnibar.
 - **Undo:** `Ctrl+Z` (when not typing in a field) and an Undo button in the removal toast revert
-  the last list change. Server keeps the last 50 list states in memory.
+  the last list change. Server keeps the last 50 list states in memory (lost on restart); only
+  list edits that changed the list are recorded. Deleting an item or recipe and merging items
+  clear the history (old states would reference them). Undo restores the list only, not usage.
 - **Clear list** button with confirmation.
 
 ### 3.6 Export & copy (P0)
@@ -196,9 +205,11 @@ Adding a recipe opens the **cull dialog** listing its ingredients as checkboxes:
   ```
 
   - Category headers are the category name uppercased; empty categories are omitted.
-  - Items sorted by name within a group; a note is appended as ` (note)`.
+  - Items sorted by name within a group (case-insensitive); a note is appended as ` (note)`.
   - Uncategorized items go last under `OTHER`. If a category named "Other" exists
-    (case-insensitive), uncategorized items merge into that group instead.
+    (case-insensitive), uncategorized items merge into that group instead (sorted together with
+    its items, at that category's position in the walk).
+  - An empty list exports as empty text.
   - Recipe sources are **not** included in the export.
 - **Copy** button and `Ctrl+Shift+C` shortcut copy the text and show "Copied N items".
 - The app is served over plain HTTP on the LAN, where `navigator.clipboard` is unavailable on
@@ -222,6 +233,9 @@ Adding a recipe opens the **cull dialog** listing its ingredients as checkboxes:
   and the list.
 - Uncategorized items are highlighted so they can be fixed later.
 - **Merge** (P2): merge item A into B — references move to B, A's name becomes an alias of B.
+  Details: A's aliases become B's too; on the list, entries fold together (sources unioned, B's
+  note kept unless it has none); recipes containing both keep B once; B adopts A's category only
+  if uncategorized; usage counts are summed (`last_used` = later); B's name and staple flag stay.
 
 ### 3.9 Categories / store order view (P1)
 
@@ -263,8 +277,9 @@ Adding a recipe opens the **cull dialog** listing its ingredients as checkboxes:
 ## 4. HTTP API
 
 All bodies are JSON. Errors are `{"error": "<human readable message>"}` with a fitting status
-(400 validation or malformed body, 404 unknown id/route, 405 wrong method, 409
-conflict/duplicate, 500 save failed). **Every mutation returns
+(400 validation, malformed/unknown body field or an unknown id inside a body value, 404 unknown
+id being acted on (URL id, or `item_id`/`recipe_id`/`into_id` of list-add and merge bodies) or
+route, 405 wrong method, 409 conflict/duplicate, 500 save failed). **Every mutation returns
 `{"state": <Snapshot>, "id": <affected or created id | null>}`**, so the client never needs a
 follow-up fetch. `Snapshot` = `{version, categories, items, recipes, list}`.
 
@@ -276,19 +291,19 @@ follow-up fetch. `Snapshot` = `{version, categories, items, recipes, list}`.
 | `POST /api/categories` | `{name}` | appended at end of walk order |
 | `PUT /api/categories/{id}` | `{name}` | rename |
 | `DELETE /api/categories/{id}` | | items → Uncategorized |
-| `PUT /api/categories/order` | `{ids: [..]}` | must be a permutation of all ids |
-| `POST /api/items` | `{name, category_id?, aliases?, staple?}` | 409 on duplicate name |
-| `PUT /api/items/{id}` | `{name, category_id, aliases, staple}` | full replace of editable fields |
+| `PUT /api/categories/order` | `{ids: [..]}` | must be a permutation of all ids (400) |
+| `POST /api/items` | `{name, category_id?, aliases?, staple?}` | 409 on duplicate name; 400 unknown category |
+| `PUT /api/items/{id}` | `{name, category_id, aliases, staple}` | full replace of editable fields; all required |
 | `DELETE /api/items/{id}` | | cascades out of recipes + list; clears list undo history |
-| `POST /api/items/{id}/merge` | `{into_id}` | P2 |
-| `POST /api/recipes` | `{name, item_ids?}` | |
-| `PUT /api/recipes/{id}` | `{name, item_ids}` | |
-| `DELETE /api/recipes/{id}` | | removes recipe sources from list entries; entries left sourceless become manual |
-| `POST /api/list/items` | `{item_id, note?}` | adds manual source; bumps usage |
-| `PUT /api/list/items/{item_id}` | `{note}` | |
-| `DELETE /api/list/items/{item_id}` | | removes the entry entirely |
-| `POST /api/list/recipes` | `{recipe_id, item_ids}` | `item_ids` = culled subset; bumps usage |
-| `DELETE /api/list/recipes/{recipe_id}` | | see 3.5 |
+| `POST /api/items/{id}/merge` | `{into_id}` | P2; see 3.8; 400 into itself; clears list undo history |
+| `POST /api/recipes` | `{name, item_ids?}` | 400 unknown item; duplicates dropped |
+| `PUT /api/recipes/{id}` | `{name, item_ids}` | list untouched |
+| `DELETE /api/recipes/{id}` | | removes recipe sources from list entries; entries left sourceless become manual; clears list undo history |
+| `POST /api/list/items` | `{item_id, note?}` | adds manual source; bumps usage (see 3.1); 404 unknown item |
+| `PUT /api/list/items/{item_id}` | `{note}` | `null`/`""` clears; 404 if not on list |
+| `DELETE /api/list/items/{item_id}` | | removes the entry entirely; chips stay; 404 if not on list |
+| `POST /api/list/recipes` | `{recipe_id, item_ids}` | `item_ids` = culled subset (else 400); bumps usage; chip added even if empty |
+| `DELETE /api/list/recipes/{recipe_id}` | | see 3.5; 404 if not on list |
 | `DELETE /api/list` | | clear |
 | `POST /api/list/undo` | | 409 when nothing to undo |
 | `GET /api/list/export` | | `text/plain; charset=utf-8` |
@@ -309,7 +324,9 @@ src/
   store.rs            load/save/backup/migrate/seed; AppState (Arc<Mutex<..>>), mutate, undo
   names.rs            normalization + validation
   demo.rs             --demo catalog (names relied on by tests)
-  error.rs            ApiError -> JSON response; ApiJson extractor
+  error.rs            ApiError -> JSON response; ApiJson / ApiPath extractors
+  catalog.rs          category/item/recipe edits incl. merge (Db methods)
+  list.rs             list edits: add/remove items and recipes, notes, clear (Db methods)
   export.rs           list -> text
   api/                one module per resource: categories, items, recipes, list, meta
 tests/                Rust integration tests (tower::ServiceExt::oneshot against app())

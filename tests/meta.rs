@@ -9,8 +9,8 @@ use serde_json::json;
 
 use common::TestApp;
 
-/// Adds an item and puts it on the list straight through the store (the mutation endpoints
-/// arrive in T3).
+/// Adds an item and puts it on the list straight through the store (fixed usage stats and
+/// timestamps, which the API would set to "now").
 fn add_to_list(app: &TestApp, name: &str) -> u64 {
     let (_, id) = app
         .state
