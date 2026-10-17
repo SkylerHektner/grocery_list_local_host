@@ -113,16 +113,16 @@ test('live sync: a change made elsewhere shows up on every open page', async ({ 
   const other = await context.newPage();
   await open(other, '#/items');
 
-  const count = page.getByTestId('count-items');
+  const count = other.getByTestId('count-recipes');
   await expect(count).toHaveText(/^\d+$/);
   const before = Number(await count.textContent());
 
-  const res = await request.post('/api/items', { data: { name: `Sync probe ${Date.now()}` } });
+  const name = `Sync probe ${Date.now()}`;
+  const res = await request.post('/api/recipes', { data: { name } });
   expect(res.ok()).toBeTruthy();
 
-  const expected = String(before + 1);
-  await expect(count).toHaveText(expected, { timeout: 6000 });
-  await expect(other.getByTestId('count-items')).toHaveText(expected, { timeout: 6000 });
+  await expect(page.getByTestId('recipe-name').filter({ hasText: name })).toBeVisible({ timeout: 6000 });
+  await expect(count).toHaveText(String(before + 1), { timeout: 6000 });
   await other.close();
 });
 

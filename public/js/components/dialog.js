@@ -1,7 +1,8 @@
 // Modal dialogs: a generic openModal() and a promise-based confirm(). Modals stack; the topmost
 // owns the keyboard (Esc closes, Tab is trapped inside, Enter runs `onEnter` unless a button,
-// link or textarea has focus). While any modal is open the app shell (#shell) is inert and the
-// page doesn't scroll. On narrow screens CSS turns the panel into a bottom sheet.
+// link or textarea has focus; a held-down, repeating Enter never confirms). While any modal is
+// open the app shell (#shell) is inert and the page doesn't scroll. On narrow screens CSS turns
+// the panel into a bottom sheet.
 //
 //   if (await confirm({ title: 'Clear the list?', confirmLabel: 'Clear', danger: true })) …
 
@@ -50,7 +51,7 @@ function onKeydown(e) {
       e.preventDefault();
       first.focus();
     }
-  } else if (e.key === 'Enter' && top.onEnter && !e.isComposing && !(e.shiftKey || e.ctrlKey || e.altKey || e.metaKey)) {
+  } else if (e.key === 'Enter' && top.onEnter && !e.isComposing && !e.repeat && !(e.shiftKey || e.ctrlKey || e.altKey || e.metaKey)) {
     const t = e.target;
     if (t instanceof HTMLButtonElement || t instanceof HTMLAnchorElement || t instanceof HTMLTextAreaElement) return;
     e.preventDefault();
@@ -78,6 +79,7 @@ function sync() {
  *   optional close button `${testid}-close`
  * @param {boolean} [options.closeButton]  show an × in the header
  * @param {boolean} [options.wide]
+ * @param {string} [options.className]  extra class on the panel (e.g. a full-screen sheet)
  * @param {() => void} [options.onRequestClose]  Esc, backdrop click or ×; default: close()
  * @param {() => void} [options.onEnter]
  * @param {() => HTMLElement | null} [options.initialFocus]  default: first focusable, else panel
@@ -90,6 +92,7 @@ export function openModal({
   testid = 'modal',
   closeButton = false,
   wide = false,
+  className,
   onRequestClose,
   onEnter,
   initialFocus,
@@ -112,7 +115,7 @@ export function openModal({
   const panel = h(
     'div',
     {
-      class: ['modal', wide && 'modal-wide'],
+      class: ['modal', wide && 'modal-wide', className],
       role: 'dialog',
       'aria-modal': 'true',
       'aria-labelledby': titleId,

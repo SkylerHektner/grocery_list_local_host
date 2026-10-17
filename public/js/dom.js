@@ -71,6 +71,14 @@ export function highlight(text, ranges) {
   return fragment(segments(text, ranges).map((s) => (s.match ? h('mark', null, s.text) : s.text)));
 }
 
+/**
+ * True on devices with a hardware keyboard and a fine pointer. Views autofocus their search box
+ * only there: on phones focusing would pop up the on-screen keyboard.
+ */
+export function isKeyboardDevice() {
+  return !matchMedia('(hover: none)').matches;
+}
+
 const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number', '']);
 
 /** True when keystrokes on `el` type text (so single-key shortcuts must not fire). */

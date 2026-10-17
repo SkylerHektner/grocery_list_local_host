@@ -538,6 +538,7 @@ textarea {
   font-size: var(--text-md);
   font-weight: 600;
   line-height: 1;
+  text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
@@ -1746,6 +1747,444 @@ code {
 @media (max-width: 959px) {
   .export-panel:not(.is-expanded) .export-body {
     display: none;
+  }
+}
+
+/* ── Shared view pieces ─────────────────────────────────────────────────────────────────── */
+
+/* A view head with the title on the left and buttons on the right (Recipes, recipe editor). */
+.split-head {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.split-head-text {
+  display: flex;
+  flex: 1 1 16rem;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.split-head-actions {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+}
+
+.field-error {
+  margin-top: 6px;
+  color: var(--danger);
+  font-size: var(--text-sm);
+  font-weight: 550;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--control-h-sm);
+  margin-inline-start: -8px;
+  padding: 0 10px 0 6px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.btn-quiet-danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* ── Recipes (views/recipes*.js, views/recipe-*.js) ─────────────────────────────────────── */
+
+.recipes-view,
+.recipe-editor {
+  gap: var(--space-3);
+}
+
+/* The index title is short: keep "New recipe" beside it, also on phones. */
+.recipes-view .split-head {
+  flex-wrap: nowrap;
+}
+
+.recipes-card {
+  padding: var(--space-1);
+}
+
+.recipe-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.recipe-row {
+  position: relative;
+  min-height: 56px;
+  padding-block: 4px;
+  cursor: pointer;
+  scroll-margin-top: calc(var(--search-h) + var(--space-6));
+  scroll-margin-bottom: calc(var(--bottom-nav-h) + var(--space-5));
+}
+
+.recipe-row:focus {
+  outline: none;
+}
+
+.recipe-row:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--focus);
+}
+
+.recipe-row.is-active::before {
+  content: "";
+  position: absolute;
+  inset-block: 10px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+.recipe-row-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding-block: 4px;
+}
+
+.recipe-row-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-weight: 650;
+}
+
+.recipe-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recipe-row-sub {
+  display: flex;
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.recipe-row-count {
+  flex: none;
+}
+
+.recipe-row-items {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recipe-row-items::before {
+  content: "·";
+  margin-inline: 6px;
+}
+
+.recipe-row-hint {
+  display: none;
+  flex: none;
+}
+
+.recipe-row.is-active .recipe-row-hint {
+  display: inline-grid;
+}
+
+.recipe-add {
+  color: var(--accent-text);
+}
+
+.recipe-add .icon {
+  stroke-width: 2.2;
+}
+
+.recipe-create {
+  min-height: var(--row-h);
+  color: var(--accent-text);
+}
+
+.recipe-create .recipe-row-title {
+  font-weight: 600;
+}
+
+.recipe-create .recipe-row-title > .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.recipe-create q {
+  color: var(--ink);
+}
+
+.recipes-none {
+  padding: 10px 12px 4px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+.recipes-empty {
+  padding: var(--space-6) var(--space-4) var(--space-5);
+}
+
+/* Editor */
+
+.recipe-nav {
+  margin-bottom: calc(-1 * var(--space-3));
+}
+
+.recipe-head {
+  padding-top: var(--space-2);
+}
+
+.recipe-name-input {
+  width: calc(100% + 18px);
+  min-width: 0;
+  margin-inline: -9px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  transition:
+    border-color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.recipe-name-input:hover {
+  border-color: var(--line-2);
+}
+
+.recipe-name-input:focus,
+.recipe-name-input:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  background: var(--surface);
+  box-shadow: var(--focus-ring);
+}
+
+.recipe-name-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.recipe-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ingredient-row .row-main {
+  cursor: default;
+}
+
+/* ── Cull dialog (components/cull-dialog.js) ────────────────────────────────────────────── */
+
+.cull-modal {
+  width: min(480px, 100%);
+  padding-bottom: var(--space-4);
+}
+
+.cull-modal .modal-head {
+  margin-bottom: 0;
+}
+
+.cull-lead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px var(--space-3);
+  margin-bottom: var(--space-2);
+  padding-inline: var(--space-2);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+.cull-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+
+.cull-keys .kbd {
+  height: 19px;
+  min-width: 19px;
+  padding: 0 5px;
+  font-size: 0.625rem;
+}
+
+.cull-keys .kbd:not(:first-child) {
+  margin-inline-start: 6px;
+}
+
+/* Rows reach a little past the text column (hover/focus backgrounds), inside the scroller. */
+.cull-modal .modal-body {
+  margin-inline: calc(-1 * var(--space-3));
+  padding-inline: var(--space-1);
+}
+
+.cull-group-header {
+  padding: var(--space-3) 10px 2px;
+}
+
+.cull-group:first-child .cull-group-header {
+  padding-top: var(--space-1);
+}
+
+.cull-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--row-h);
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--dur) var(--ease);
+}
+
+@media (hover: hover) {
+  .cull-label:hover {
+    background: var(--surface-2);
+  }
+}
+
+.cull-label:has(.cull-check:focus-visible) {
+  background: var(--accent-soft);
+}
+
+.cull-check:focus-visible {
+  outline-offset: 1px;
+}
+
+.cull-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  transition: color var(--dur) var(--ease);
+}
+
+.cull-row.is-skipped .cull-name {
+  color: var(--ink-3);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--ink-3) 60%, transparent);
+}
+
+.cull-tags {
+  display: inline-flex;
+  flex: none;
+  gap: 4px;
+}
+
+.cull-modal .modal-actions {
+  align-items: center;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.cull-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-end: auto;
+}
+
+.cull-count {
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cull-toggle-all {
+  color: var(--accent-text);
+}
+
+.name-field .input {
+  min-height: 44px;
+  font-size: var(--text-lg);
+}
+
+@media (max-width: 700px) {
+  .recipe-name-input {
+    font-size: var(--text-xl);
+  }
+
+  .recipe-head .split-head-actions {
+    width: 100%;
+  }
+
+  .recipe-head .split-head-actions .btn {
+    flex: 1;
+  }
+
+  .recipe-row-items {
+    display: none;
+  }
+
+  /* The cull dialog is a full-screen sheet: big rows, the confirm button always in reach. */
+  .modal.cull-modal {
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top));
+    border-width: 0;
+    border-radius: 0;
+  }
+
+  .modal.cull-modal::before {
+    display: none;
+  }
+
+  .cull-modal .modal-body {
+    flex: 1;
+  }
+
+  .cull-label {
+    min-height: 52px;
+  }
+
+  .cull-modal .modal-actions {
+    grid-template-columns: 1fr 1fr;
+    margin-top: var(--space-2);
+  }
+
+  .cull-status {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+    margin-inline-end: 0;
   }
 }
 

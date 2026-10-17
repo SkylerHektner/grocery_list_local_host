@@ -54,7 +54,7 @@ export const SHORTCUT_GROUPS = [
     title: 'Adding a recipe',
     views: ['list', 'recipes'],
     items: [
-      { keys: ['↑', '↓'], label: 'Move between ingredients' },
+      { keys: ['↑', '↓', 'j', 'k'], label: 'Move between ingredients' },
       { keys: ['Space'], label: 'Keep or skip the ingredient' },
       { keys: ['a'], label: 'Toggle all' },
       { keys: ['Enter'], label: 'Add to the list' },
@@ -64,7 +64,27 @@ export const SHORTCUT_GROUPS = [
   {
     title: 'Recipes',
     views: ['recipes'],
-    items: [{ keys: ['n'], label: 'New recipe' }],
+    items: [
+      { keys: ['Enter'], label: 'In the filter: open the top match, or create the typed name' },
+      { keys: ['↓'], label: 'From the filter: move into the recipes' },
+      { keys: ['↑', '↓', 'j', 'k'], label: 'Move between recipes (↑ on the first: back to the filter)' },
+      { keys: ['Enter'], label: 'Open the recipe' },
+      { keys: ['a'], label: 'Add the recipe to the list' },
+      { keys: ['n'], label: 'New recipe' },
+      { keys: ['/', 'Esc'], label: 'Back to the filter' },
+    ],
+  },
+  {
+    title: 'Recipe editor',
+    views: ['recipes'],
+    items: [
+      { keys: ['F2'], label: 'Rename the recipe (Enter saves, Esc cancels)' },
+      { keys: ['↓'], label: 'From the empty search: move into the ingredients' },
+      { keys: ['↑', '↓', 'j', 'k'], label: 'Move between ingredients (↑ on the first: back to the search)' },
+      { keys: ['Delete', 'Backspace', 'x'], label: 'Remove the ingredient' },
+      { keys: ['/', 'Esc'], label: 'Back to the search' },
+      { keys: ['Esc'], label: 'From the empty search: back to the recipes (or the list)' },
+    ],
   },
   {
     title: 'Store order',

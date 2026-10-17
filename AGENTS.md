@@ -36,8 +36,19 @@ public/                 frontend, served from disk (no build step, no runtime de
   js/fuzzy*.js          fuzzy search: fuzzy.js API, fuzzy-text.js normalization, fuzzy-tiers.js
   js/dom.js  icons.js   h() element builder, highlight(), rerender() / inline SVG icons
   js/router.js  shortcuts.js   hash routes / every SPEC shortcut for the `?` overlay
-  js/components/        toast.js, dialog.js (openModal, confirm), shortcut-help.js
-  js/views/             list, recipes, items, categories (+ placeholder.js until T5-T7)
+  js/queue.js           serial mutation queue (fast entry lands in order)
+  js/clipboard.js       copy with fallbacks for plain-HTTP phones
+  js/*-model.js         DOM-free logic: omnibar-model (search/picker/keys), list-model
+                        (grouping, focus), recipes-model (index filter, ingredient order/edits),
+                        cull-model (cull dialog defaults, toggles, messages)
+  js/components/        toast.js, dialog.js (openModal, confirm), shortcut-help.js, empty.js,
+                        omnibar.js (+ omnibar-rows.js DOM), cull-dialog.js (addRecipeWithCull),
+                        name-dialog.js (promptName), copy-dialog.js, sticky-bar.js
+  js/views/list*.js     List view: list.js + list-rows/list-row-view (rows), list-chips,
+                        list-export (paste preview)
+  js/views/recipe*.js   Recipes view: recipes.js (routes #/recipes and #/recipes/<id>, shared
+                        queue), recipes-index(-view).js, recipe-editor.js, recipe-ingredients.js
+  js/views/             items, categories (placeholder.js until T7)
   js/*.test.js          node:test unit tests for the DOM-free modules
 e2e/                    Playwright Test (own package.json, uses system Microsoft Edge)
   playwright.config.ts  global-teardown.ts  tests/fixtures.ts  tests/*.spec.ts

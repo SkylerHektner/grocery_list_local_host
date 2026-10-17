@@ -1,11 +1,12 @@
 // List view (SPEC §3.1, §3.2, §3.5, §3.6): the omnibar, recipe chips, the grouped list and the
-// export preview with copy. Pieces: components/omnibar.js, views/list-chips.js,
-// views/list-rows.js (rows, keyboard navigation, notes, removal; DOM in list-row-view.js),
-// views/list-export.js (preview), clipboard.js (copy fallbacks).
+// export preview with copy. Pieces: components/omnibar.js, components/cull-dialog.js (picking a
+// recipe), views/list-chips.js, views/list-rows.js (rows, keyboard navigation, notes, removal;
+// DOM in list-row-view.js), views/list-export.js (preview), clipboard.js (copy fallbacks).
 //
 // Every mutation goes through one queue (queue.js), so rapid adds, removals and undos land in
 // order. Feedback is quiet: an added row is highlighted and scrolled into view (and announced to
-// screen readers); toasts are only for "already on the list", errors, and removals with Undo.
+// screen readers); toasts are only for "already on the list", errors, recipes added and
+// removals (both with Undo).
 // Ctrl+Shift+C copies from anywhere in the view; Ctrl+Z undoes when not typing in a field.
 
 import { h, isTypingTarget } from '../dom.js';
@@ -16,6 +17,8 @@ import { addedEntries, plural, summary } from '../list-model.js';
 import { isModalOpen } from '../components/dialog.js';
 import { openCopyDialog } from '../components/copy-dialog.js';
 import { createOmnibar } from '../components/omnibar.js';
+import { addRecipeWithCull } from '../components/cull-dialog.js';
+import { stickyBar } from '../components/sticky-bar.js';
 import { createRecipeChips } from './list-chips.js';
 import { createListRows } from './list-rows.js';
 import { createExportPanel } from './list-export.js';
@@ -68,17 +71,19 @@ function mount(container, ctx) {
     rows.reveal(item.id);
   }
 
-  // T6 seam: picking a recipe should open the cull dialog (SPEC §3.4). Until then it adds the
-  // recipe with the dialog's defaults (every ingredient except staples), with Undo.
-  async function addRecipe(recipe) {
-    const state = store.state;
-    const keep = recipe.item_ids.filter((id) => state.itemsById.has(id) && !state.itemsById.get(id).staple);
-    await api.addRecipeToList(recipe.id, keep);
-    const skipped = recipe.item_ids.length - keep.length;
-    toast(`Added ${recipe.name}${skipped ? ` (skipped ${plural(skipped, 'staple')})` : ''}`, { action: undoAction });
+  /** Picking a recipe: the cull dialog (SPEC §3.4), then "Added 8 items from Tacos" + Undo. */
+  function addRecipe(recipe) {
+    return addRecipeWithCull({
+      recipe,
+      store,
+      api,
+      toast,
+      onUndo: undo,
+      onEdit: () => ctx.navigate('recipes', recipe.id),
+    });
   }
 
-  /** "+ Create recipe": create it, then open its editor (#/recipes/<id>, built in T6). */
+  /** "+ Create recipe": create it, then open its editor (#/recipes/<id>). */
   async function createRecipe(name) {
     const { id } = await api.createRecipe({ name });
     ctx.navigate('recipes', id);
@@ -200,15 +205,7 @@ function mount(container, ctx) {
 
   // ── Layout ───────────────────────────────────────────────────────────────────────────────
 
-  const bar = h('div', { class: 'sticky-bar list-bar', testid: 'list-bar' }, omnibar.el);
-  const sentinel = h('div', { class: 'list-bar-sentinel', 'aria-hidden': 'true' });
-  if (typeof IntersectionObserver === 'function') {
-    const observer = new IntersectionObserver(([entry]) => {
-      bar.classList.toggle('is-stuck', !entry.isIntersecting && entry.boundingClientRect.top < 0);
-    });
-    observer.observe(sentinel);
-    ctx.onCleanup(() => observer.disconnect());
-  }
+  const { sentinel, bar } = stickyBar(ctx, { testid: 'list-bar' }, omnibar.el);
 
   container.classList.add('view-wide', 'list-view');
   container.append(

@@ -176,7 +176,24 @@ turns `\n` into `\r\n` on read-back, and the desktop clipboard test uses the rea
   tap), keyboard culling + undo, copy produces exact expected text, two-page live sync.
 
 ## T6 — Recipes
-- [ ] Done
+- [x] Done
+
+Notes: **Cull dialog** = `addRecipeWithCull({recipe, store, api, toast, onUndo, onEdit})` in
+`components/cull-dialog.js` (run it inside the view's queue; `openCullDialog` for just the
+choice); logic in `cull-model.js`. **Recipes view** (`views/recipes.js`) swaps its index and
+editor halves via `onParams`, each with its own scoped ctx (`scoped()`; copy it if a T7 view
+needs sub-routes). Reusable for T7: `promptName({title, label, value, confirmLabel, testid,
+submit})` (`components/name-dialog.js`: one-field modal, server error inline; good for adding/
+renaming categories), `stickyBar(ctx, {testid}, ...children)` (`components/sticky-bar.js`),
+`isKeyboardDevice()` (dom.js, autofocus only there), `openModal({className})`, CSS
+`.split-head(-text|-actions) .field-error .back-link .btn-quiet-danger` (and `.btn` links have no
+underline). The view contract gained `ctx.from` (the previously shown view id). Modals ignore a
+held-down, repeating Enter. `recipes-model.js` has `ingredientGroups` (walk-order grouping of any
+item-id list) and `filterRecipes`. E2E: `tests/recipes.spec.ts` helpers (`createRecipe`,
+`itemIds`, `listNames`); `shell.spec.ts`'s live-sync test now watches the recipes index and the
+Items placeholder's `count-recipes` stat, so update it when T7 replaces the Items view. Expected
+409s still log console errors (clear `consoleErrors`). Seen, not fixed (T5 List view, for T8): at
+375 px a long name next to a recipe tag wraps mid-word ("Parmigian / o / Reggiano").
 
 - Recipes view and editor (§3.7) reusing the omnibar, including inline item creation.
 - Cull dialog (§3.4) from both the omnibar and the Recipes view.

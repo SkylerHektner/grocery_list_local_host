@@ -183,16 +183,27 @@ Pure function module (`public/js/fuzzy.js`), unit-tested with `node --test`. Req
 
 ### 3.4 Recipes → list with culling (P0)
 
-Adding a recipe opens the **cull dialog** listing its ingredients as checkboxes:
+Adding a recipe (from the List omnibar, or "Add to list" / `a` in the Recipes view) opens the
+**cull dialog** listing its ingredients as checkboxes, ordered like the list (walk order, then
+name, with category headers):
 
-- Default checked, **except** staples (unchecked, tagged "staple").
+- Default checked, **except** staples (unchecked, tagged "staple"). A staple that is already on
+  the list starts checked (confirming only adds the recipe as a source there).
 - Items already on the list are tagged "on list"; confirming with them checked just adds the
   recipe as an extra source (never duplicates).
 - Confirming with nothing checked still adds the recipe chip (the user saw the recipe and culled
   everything); adding a recipe that is already on the list extends it.
-- Keyboard: `↑`/`↓` move, `Space` toggles, `a` toggles all, `Enter` confirms, `Esc` cancels.
-- The dialog shows a live "Adding N of M" count.
-- Mobile: full-screen sheet with large checkboxes and a sticky confirm button.
+- Keyboard: `↑`/`↓` (`j`/`k`, `Home`/`End`) move, `Space` toggles, `a` toggles all (a "Check
+  all / Uncheck all" button does the same for touch), `Enter` confirms, `Esc` cancels. Focus is
+  trapped in the dialog and returns afterwards to where it was (the omnibar, the recipe row).
+- The dialog shows a live "Adding N of M" count; skipped rows are struck through.
+- Live sync while it is open keeps the user's choices (new ingredients get the defaults); if the
+  recipe is deleted meanwhile the dialog closes with a toast.
+- Confirming shows "Added 8 items from Tacos" (or "Added Tacos without any items") with Undo;
+  if the list did not change at all ("Tacos is already on the list") there is nothing to undo.
+- A recipe without ingredients shows "Tacos has no ingredients" instead, offering its editor
+  (`Enter`).
+- Mobile: full-screen sheet with large rows (≥ 52 px) and a sticky confirm button.
 
 ### 3.5 List view (P0)
 
@@ -255,13 +266,55 @@ Adding a recipe opens the **cull dialog** listing its ingredients as checkboxes:
 
 ### 3.7 Recipes view (P0)
 
-- Fuzzy-filterable list of recipes with ingredient counts.
-- New recipe: type a name (`n` shortcut or "New recipe" button), then add ingredients with the
-  same omnibar (including inline item creation). Ingredient rows are removable by keyboard and tap.
-- Rename, delete (with confirmation), and "Add to list" (opens the cull dialog).
-- Creating a recipe from the List-view omnibar: the create row offers both
-  `+ Create item "…"` and `+ Create recipe "…"`; creating a recipe (`POST /api/recipes` with the
-  typed name) jumps to its editor at `#/recipes/<id>`.
+Two routes: the index at `#/recipes` and a recipe's editor at `#/recipes/<id>` (an unknown id
+shows a friendly "Recipe not found" with a link back; it turns into the editor if live sync
+brings the recipe in, e.g. one just created on another device).
+
+**Index**
+
+- Fuzzy-filterable list of recipes (by name when the filter is empty) showing the ingredient
+  count, a one-line preview of the ingredients (wide screens) and an "on list" tag; each row has
+  a visible "Add" button (cull dialog).
+- Keyboard: typing filters; `Enter` in the filter opens the top match (highlighted); `↓` moves
+  into the rows; on a row `↑`/`↓`/`j`/`k` move (`↑` on the first returns to the filter),
+  `Home`/`End`, `Enter` opens the editor, `a` adds to the list (cull dialog), `/` or `Esc` go back
+  to the filter. Rows use a roving tabindex.
+- Whenever the filter text does not name a recipe exactly, the rows end with
+  `+ New recipe "…"`; when nothing matches it is the top row, so `Enter` creates the recipe and
+  opens its editor.
+- New recipe: `n` (when not typing) or the "New recipe" button asks for a name in a small dialog
+  (prefilled with the filter text; the server's error, e.g. a duplicate, shows inline), then
+  opens the editor.
+- Coming back from an editor focuses that recipe's row, so `a` adds it right away.
+
+**Editor**
+
+- The name is an inline field: `Enter` or leaving the field saves (normalized); the server's
+  validation message shows under it and the typed text stays; `Esc` puts the saved name back;
+  `F2` jumps to it. `Enter` then moves on to the ingredient search.
+- Ingredients are added with the same omnibar as the List view (items only: no recipes, no
+  create-recipe row), including inline item creation with the category picker; the created item
+  joins the recipe. Items already in the recipe are badged "in recipe" in the dropdown; picking
+  one again only says "Milk is already in Tacos". Focus stays in the omnibar for rapid entry, and
+  adds run one at a time through a queue, each reading the latest recipe, so fast typing never
+  drops an ingredient.
+- Ingredient rows are grouped and ordered like the list (walk order, then name; staples tagged)
+  with an always-visible remove button. Keyboard: `↓` from the empty omnibar moves into the rows;
+  `↑`/`↓`/`j`/`k`/`Home`/`End` move; `Delete`/`Backspace`/`x` removes (focus moves to the next
+  row, else the previous, else the omnibar); `/` or `Esc` go back to the omnibar. A removal toast
+  offers Undo (the ingredient goes back where it was).
+- "Add to list" opens the cull dialog (a recipe without ingredients just says to add some
+  first); "Delete" asks for confirmation (the recipe comes off the list; its items stay there as
+  manual entries — see §4), then returns to the index.
+- Back: a back link and `Esc` in the empty omnibar return to where the editor was opened from:
+  the List view right after `+ Create recipe "…"` there (so the next step, adding the new recipe
+  to the list, is a few keystrokes away), else the index.
+- Live sync never touches the name field while it is focused or holds an unsaved/rejected edit,
+  nor the omnibar text; new ingredients from another device are briefly highlighted.
+
+**From the List view:** the omnibar's create rows offer both `+ Create item "…"` and
+`+ Create recipe "…"`; creating a recipe (`POST /api/recipes` with the typed name) jumps to its
+editor at `#/recipes/<id>`. Picking a recipe opens the cull dialog (§3.4).
 
 ### 3.8 Items catalog view (P1)
 
@@ -380,9 +433,12 @@ public/
   js/fuzzy.js         pure fuzzy matcher (+ fuzzy-text.js, fuzzy-tiers.js, fuzzy.test.js)
   js/dom.js           h() element builder, highlight(), focus-preserving rerender()
   js/queue.js         serial mutation queue; js/clipboard.js: copy with fallbacks
-  js/omnibar-model.js js/list-model.js   pure logic behind the omnibar and the list
-  js/components/      omnibar (+ category picker), cull dialog, toast, dialog, copy dialog
-  js/views/           list (+ list-*.js), recipes, items, categories
+  js/omnibar-model.js js/list-model.js js/recipes-model.js js/cull-model.js
+                      pure logic behind the omnibar, the list, the recipes view, the cull dialog
+  js/components/      omnibar (+ category picker), cull dialog, name dialog, toast, dialog,
+                      copy dialog, sticky bar
+  js/views/           list (+ list-*.js), recipes (+ recipes-index*.js, recipe-*.js), items,
+                      categories
 e2e/                  Playwright (own package.json; dev-only)
 scripts/check.ps1     run every check (also check.sh)
 docs/                 SPEC.md, TASKS.md, API.md

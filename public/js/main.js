@@ -19,6 +19,7 @@
 // ctx = {
 //   store, api,                    store.js / api.js singletons (api mutations update the store)
 //   params,                        extra hash segments, e.g. ['12'] for #/recipes/12
+//   from,                          id of the view shown before this one (null on page load)
 //   toast, confirm,                components/toast.js, components/dialog.js
 //   navigate(viewId, ...params),   sets the hash
 //   subscribe(fn),                 store.subscribe, removed automatically on unmount
@@ -72,6 +73,7 @@ function unmountCurrent() {
 
 function mount(id, params) {
   const hadFocus = viewRoot.contains(document.activeElement);
+  const from = current?.id ?? null;
   unmountCurrent();
   const view = VIEW_MODULES[id];
   const section = h('section', { class: 'view', testid: `view-${id}`, 'aria-label': view.title });
@@ -81,6 +83,7 @@ function mount(id, params) {
     store,
     api,
     params,
+    from,
     toast,
     confirm,
     navigate,

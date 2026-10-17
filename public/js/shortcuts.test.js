@@ -27,8 +27,23 @@ test('extra view shortcuts join the view group once, without mutating the data',
   const before = JSON.stringify(SHORTCUT_GROUPS);
   const extra = [{ keys: ['n'], label: 'New recipe' }, { keys: ['r'], label: 'Rename' }];
   const recipes = groupsFor('recipes', 'Recipes', extra).find((g) => g.title === 'Recipes');
-  assert.deepEqual(recipes.items.map((i) => i.label), ['New recipe', 'Rename']);
+  const labels = recipes.items.map((i) => i.label);
+  assert.equal(labels.filter((l) => l === 'New recipe').length, 1);
+  assert.equal(labels.at(-1), 'Rename');
   const items = groupsFor('items', 'Items', [{ keys: ['e'], label: 'Edit' }]);
   assert.equal(items[1].title, 'Items');
   assert.equal(JSON.stringify(SHORTCUT_GROUPS), before);
+});
+
+test('the recipes view lists its index, editor and cull keys', () => {
+  const groups = groupsFor('recipes', 'Recipes');
+  assert.deepEqual(groups.slice(1, 6).map((g) => g.title), [
+    'Search box',
+    'New item: pick a category',
+    'Adding a recipe',
+    'Recipes',
+    'Recipe editor',
+  ]);
+  const keys = groups.flatMap((g) => (g.views?.includes('recipes') ? g.items.flatMap((i) => i.keys) : []));
+  for (const key of ['a', 'n', 'F2', 'Delete', 'Space', 'Enter', 'Esc']) assert.ok(keys.includes(key), key);
 });
