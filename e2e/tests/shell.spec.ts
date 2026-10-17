@@ -108,7 +108,37 @@ test('? opens the shortcut overlay; Esc closes it and restores focus', async ({ 
   await expect(button).toBeFocused();
 });
 
-test('live sync: a change made elsewhere shows up on every open page', async ({ page, context, request }) => {
+test('light by default even on a dark OS; the header toggle switches to dark and remembers it', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/#/list');
+  await page.evaluate(() => localStorage.removeItem('grocery-theme'));
+  await open(page, '#/list');
+  const html = page.locator('html');
+  const paper = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--paper').trim());
+  const toggle = page.getByRole('button', { name: 'Dark mode' });
+  await expect(html).not.toHaveAttribute('data-theme');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  expect(await paper()).toBe('#f6f2e9');
+
+  await toggle.click();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  expect(await paper()).toBe('#1b1a17');
+
+  // Remembered across reloads, then back to light (and that sticks too).
+  await page.reload();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await toggle.click();
+  await expect(html).not.toHaveAttribute('data-theme');
+  await page.reload();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  expect(await paper()).toBe('#f6f2e9');
+});
+
+test('live sync: a change made elsewhere shows up on every open page',async ({ page, context, request }) => {
   await open(page, '#/recipes');
   const other = await context.newPage();
   await open(other, '#/items');

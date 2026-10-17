@@ -38,6 +38,7 @@ import { bindLiveSync, createLiveSync, store } from './store.js';
 import { DEFAULT_VIEW, VIEWS, hashFor, parseHash } from './router.js';
 import { h, isKeyboardDevice, isTypingTarget, parkFocus, setFocusFallback } from './dom.js';
 import { trackVisualViewport } from './viewport.js';
+import { bindThemeToggle } from './theme.js';
 import { toast } from './components/toast.js';
 import { confirm, isModalOpen } from './components/dialog.js';
 import { openShortcutHelp } from './components/shortcut-help.js';
@@ -224,6 +225,7 @@ store.subscribe((state, prev) => {
 
 document.addEventListener('keydown', onKeydown);
 document.querySelector('[data-testid="shortcuts-button"]').addEventListener('click', showShortcuts);
+bindThemeToggle(document.querySelector('[data-testid="theme-toggle"]'));
 window.addEventListener('hashchange', route);
 bindLiveSync(sync, window);
 trackVisualViewport(window);

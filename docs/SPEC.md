@@ -399,8 +399,10 @@ editor at `#/recipes/<id>`. Picking a recipe opens the cull dialog (§3.4).
 - The header shows a live-sync indicator (Live / "Offline — reconnecting"; on phones just a
   dot, plus "Offline" when offline) and a keyboard button that opens the shortcut overlay (for
   touch users).
-- Light and dark themes via `prefers-color-scheme`. Text, muted text included, has at least
-  4.5:1 contrast in both.
+- Light theme by default, whatever the OS prefers. A header button (moon / sun, `aria-pressed`)
+  switches to dark and back; the choice is remembered per device (`localStorage`
+  `grocery-theme`, applied before first paint; `public/js/theme.js`). Text, muted text included,
+  has at least 4.5:1 contrast in both.
 - Responsive: single column ≤ 700 px with the view tabs as a bottom tab bar that never covers
   content or toasts, sticky omnibar, tap targets ≥ 44 px, dialogs as bottom sheets that sit
   above the on-screen keyboard (`public/js/viewport.js` follows `window.visualViewport`; the

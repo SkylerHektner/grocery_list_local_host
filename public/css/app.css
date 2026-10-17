@@ -15,7 +15,8 @@
                 .row-actions; .is-active) .muted
      labels     .tag (.tag-accent .tag-warm .tag-danger) .chip (.chip-remove) .kbd mark
      feedback   .empty (.empty-art .empty-title .empty-body) .toast-* .modal-* .sync
-   Tokens are CSS custom properties on :root (light) and redefined for dark below. */
+   Tokens are CSS custom properties on :root (light, the default whatever the OS prefers) and
+   redefined for dark below under :root[data-theme="dark"]. */
 
 /* ── Tokens ─────────────────────────────────────────────────────────────────────────────── */
 
@@ -108,60 +109,58 @@
   --dur: 160ms;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
+:root[data-theme="dark"] {
+  color-scheme: dark;
 
-    --paper: #1b1a17;
-    --paper-edge: #22201c;
-    --surface: #24221e;
-    --surface-2: #2c2a25;
-    --surface-3: #36332d;
-    --ink: #ede7db;
-    --ink-2: #b6afa1;
-    --ink-3: #a8a091;
-    --line: #34312b;
-    --line-2: #46423a;
+  --paper: #1b1a17;
+  --paper-edge: #22201c;
+  --surface: #24221e;
+  --surface-2: #2c2a25;
+  --surface-3: #36332d;
+  --ink: #ede7db;
+  --ink-2: #b6afa1;
+  --ink-3: #a8a091;
+  --line: #34312b;
+  --line-2: #46423a;
 
-    --accent: #86c9a1;
-    --accent-hover: #9bd5b2;
-    --accent-ink: #10261a;
-    --accent-text: #95d3ae;
-    --accent-soft: rgb(134 201 161 / 0.13);
-    --accent-soft-2: rgb(134 201 161 / 0.22);
+  --accent: #86c9a1;
+  --accent-hover: #9bd5b2;
+  --accent-ink: #10261a;
+  --accent-text: #95d3ae;
+  --accent-soft: rgb(134 201 161 / 0.13);
+  --accent-soft-2: rgb(134 201 161 / 0.22);
 
-    --note: #e3bd4f;
-    --note-fold: #b8922f;
-    --note-soft: #27251f;
-    --note-line: #3d382b;
-    /* Dark: a faint band plus bright highlighter-yellow letters (a dim yellow wash under grey
-       alias text was muddy and hard to read). */
-    --mark: rgb(240 196 80 / 0.2);
-    --mark-ink: #f5d47a;
-    --flash: rgb(227 189 79 / 0.2);
+  --note: #e3bd4f;
+  --note-fold: #b8922f;
+  --note-soft: #27251f;
+  --note-line: #3d382b;
+  /* Dark: a faint band plus bright highlighter-yellow letters (a dim yellow wash under grey
+     alias text was muddy and hard to read). */
+  --mark: rgb(240 196 80 / 0.2);
+  --mark-ink: #f5d47a;
+  --flash: rgb(227 189 79 / 0.2);
 
-    --warm: #e9b764;
-    --warm-soft: rgb(233 183 100 / 0.13);
-    --danger: #f0776c;
-    --danger-hover: #f48e85;
-    --danger-ink: #2a0d0a;
-    --danger-soft: rgb(240 119 108 / 0.14);
-    --live: #6fc392;
-    --offline: #e9a944;
+  --warm: #e9b764;
+  --warm-soft: rgb(233 183 100 / 0.13);
+  --danger: #f0776c;
+  --danger-hover: #f48e85;
+  --danger-ink: #2a0d0a;
+  --danger-soft: rgb(240 119 108 / 0.14);
+  --live: #6fc392;
+  --offline: #e9a944;
 
-    --toast-bg: #efe9dd;
-    --toast-ink: #24211c;
-    --toast-accent: #2a6547;
-    --toast-danger: #b3261e;
+  --toast-bg: #efe9dd;
+  --toast-ink: #24211c;
+  --toast-accent: #2a6547;
+  --toast-danger: #b3261e;
 
-    --focus: #95d3ae;
-    --focus-ring: 0 0 0 3px rgb(134 201 161 / 0.22);
-    --backdrop: rgb(0 0 0 / 0.55);
+  --focus: #95d3ae;
+  --focus-ring: 0 0 0 3px rgb(134 201 161 / 0.22);
+  --backdrop: rgb(0 0 0 / 0.55);
 
-    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3);
-    --shadow-2: 0 12px 30px -8px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.3);
-    --shadow-3: 0 28px 70px -12px rgb(0 0 0 / 0.7), 0 4px 12px rgb(0 0 0 / 0.35);
-  }
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-2: 0 12px 30px -8px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.3);
+  --shadow-3: 0 28px 70px -12px rgb(0 0 0 / 0.7), 0 4px 12px rgb(0 0 0 / 0.35);
 }
 
 @media (pointer: coarse) {
@@ -218,12 +217,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    background-image:
-      radial-gradient(120% 60% at 50% -10%, rgb(255 240 210 / 0.035), transparent 70%),
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .95 0 0 0 0 .85 0 0 0 .035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
+:root[data-theme="dark"] body {
+  background-image:
+    radial-gradient(120% 60% at 50% -10%, rgb(255 240 210 / 0.035), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .95 0 0 0 0 .85 0 0 0 .035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 h1,
@@ -422,6 +419,16 @@ textarea {
   align-items: center;
   gap: var(--space-2);
   margin-inline-start: auto;
+}
+
+/* Theme toggle: a moon in light mode (switch to dark), a sun in dark mode. */
+.theme-toggle .theme-icon-sun,
+:root[data-theme="dark"] .theme-toggle .theme-icon-moon {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-toggle .theme-icon-sun {
+  display: inline;
 }
 
 .sync {

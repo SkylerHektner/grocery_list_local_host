@@ -260,3 +260,18 @@ failed poll while offline (now backed off); the keyboard-aware sheets are verifi
 - Accessibility pass: labels, roles, `aria-activedescendant` on listboxes, focus management.
 - Performance check with 1,000+ items (search stays instant).
 - Bug sweep against SPEC; update docs; final `scripts/check.ps1` green.
+
+## T9 — UI feedback (owner's annotated screenshot, one note at a time)
+- [ ] Done
+
+Do these one by one (each its own commit; a fresh session can pick up the next unticked one):
+
+- [x] Light mode by default (ignores the OS preference) + header light/dark toggle.
+- [ ] Bigger category group headers on the List view ("PRODUCE 16").
+- [ ] List view items in a grid of tiles per category instead of one long column.
+- [ ] Remove the paste preview side panel from the List view.
+
+Notes: Theme: `public/js/theme.js` (+ `theme.test.js`); dark palette is `:root[data-theme="dark"]`
+in `app.css` (no `prefers-color-scheme` anywhere); `localStorage` `grocery-theme` = `dark` or
+absent; an inline `<head>` script in `index.html` applies it before first paint; header button
+`data-testid="theme-toggle"` ("Dark mode", `aria-pressed`). E2E: `shell.spec.ts`.
