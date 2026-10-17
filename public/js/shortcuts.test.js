@@ -17,6 +17,12 @@ test('groupsFor puts Everywhere first, then the view, then the rest', () => {
   assert.equal(titles.length, SHORTCUT_GROUPS.length);
 });
 
+test('the list view lists its own keys: undo, copy, culling, notes', () => {
+  const list = groupsFor('list', 'List').find((g) => g.title === 'List');
+  const keys = list.items.flatMap((i) => i.keys);
+  for (const key of ['Ctrl+Z', 'Ctrl+Shift+C', 'Delete', 'x', 'n', 'j', 'k']) assert.ok(keys.includes(key), key);
+});
+
 test('extra view shortcuts join the view group once, without mutating the data', () => {
   const before = JSON.stringify(SHORTCUT_GROUPS);
   const extra = [{ keys: ['n'], label: 'New recipe' }, { keys: ['r'], label: 'Rename' }];

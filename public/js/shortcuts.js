@@ -12,8 +12,6 @@ export const SHORTCUT_GROUPS = [
       { keys: ['/', 'Ctrl+K'], label: 'Focus the search box' },
       { keys: ['?'], label: 'Show keyboard shortcuts' },
       { keys: ['Esc'], label: 'Close a dialog or this overlay' },
-      { keys: ['Ctrl+Z'], label: 'Undo the last list change' },
-      { keys: ['Ctrl+Shift+C'], label: 'Copy the list' },
     ],
   },
   {
@@ -35,7 +33,7 @@ export const SHORTCUT_GROUPS = [
       { keys: ['0', 'Tab'], label: 'Uncategorized' },
       { keys: ['↑', '↓'], label: 'Move the highlight' },
       { keys: ['Enter'], label: 'Pick the highlighted category' },
-      { keys: ['Esc'], label: 'Back to the search' },
+      { keys: ['Esc', 'Backspace'], label: 'Back to the search (Backspace: when the filter is empty)' },
     ],
   },
   {
@@ -43,10 +41,13 @@ export const SHORTCUT_GROUPS = [
     views: ['list'],
     items: [
       { keys: ['↓'], label: 'From an empty search: move into the list' },
-      { keys: ['↑', '↓', 'j', 'k'], label: 'Move between items' },
+      { keys: ['↑', '↓', 'j', 'k'], label: 'Move between items (↑ on the first: back to the search)' },
+      { keys: ['Home', 'End'], label: 'First / last item' },
       { keys: ['Delete', 'Backspace', 'x'], label: 'Remove the item' },
       { keys: ['Enter', 'n'], label: 'Edit the note (Enter saves, Esc cancels)' },
       { keys: ['/', 'Esc'], label: 'Back to the search' },
+      { keys: ['Ctrl+Z'], label: 'Undo the last list change (when not typing)' },
+      { keys: ['Ctrl+Shift+C'], label: 'Copy the list (also from the search box)' },
     ],
   },
   {

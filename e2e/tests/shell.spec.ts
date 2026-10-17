@@ -48,8 +48,10 @@ test('Alt+1..4 switch views; / and Ctrl+K focus the search box', async ({ page }
     await expect(page.getByTestId(`view-${id}`)).toBeVisible();
   }
 
-  // On the list view now. `/` focuses its search box and is not typed into it.
+  // On the list view now (its omnibar may be autofocused: Esc on the empty box leaves it).
+  // `/` focuses the search box and is not typed into it.
   const search = page.getByTestId('list-search');
+  await page.keyboard.press('Escape');
   await expect(search).not.toBeFocused();
   await page.keyboard.press('/');
   await expect(search).toBeFocused();
@@ -70,11 +72,12 @@ test('Alt+1..4 switch views; / and Ctrl+K focus the search box', async ({ page }
 test('the search box previews fuzzy matches with highlighting', async ({ page }) => {
   await open(page, '#/list');
   await page.getByTestId('list-search').fill('pmsn');
-  const first = page.getByTestId('search-result').first();
+  const first = page.getByTestId('omnibar-option').first();
   await expect(first).toContainText('Parmigiano Reggiano');
   await expect(first.locator('mark')).toHaveText(['P', 'm', 's', 'n']);
   await page.getByTestId('list-search').fill('xqz');
-  await expect(page.getByTestId('list-results')).toContainText('No matches');
+  await expect(page.getByTestId('omnibar-option')).toHaveCount(0);
+  await expect(page.getByTestId('omnibar-create-item')).toHaveText(/Create item.*xqz/);
 });
 
 test('? opens the shortcut overlay; Esc closes it and restores focus', async ({ page }) => {
@@ -106,7 +109,7 @@ test('? opens the shortcut overlay; Esc closes it and restores focus', async ({ 
 });
 
 test('live sync: a change made elsewhere shows up on every open page', async ({ page, context, request }) => {
-  await open(page, '#/list');
+  await open(page, '#/recipes');
   const other = await context.newPage();
   await open(other, '#/items');
 

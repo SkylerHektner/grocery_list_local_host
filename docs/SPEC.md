@@ -106,22 +106,33 @@ Priority: **P0** = required for v1, **P1** = in v1 scope, **P2** = nice-to-have 
 
 ### 3.1 Omnibar — the core loop (P0)
 
-One search/add input at the top of the List view, autofocused on load. Also reused in the recipe
-editor for adding ingredients.
+One search/add input at the top of the List view (sticky while scrolling), autofocused on load on
+keyboard devices (not on touch screens, where focusing would pop up the on-screen keyboard). Also
+reused in the recipe editor for adding ingredients (`public/js/components/omnibar.js`).
 
-- Typing shows a dropdown of fuzzy matches across **items and recipes** (recipes visibly labeled).
-  Each item row shows its category; items already on the list are marked "on list".
-- `↑`/`↓` move the highlight; `Enter` picks it; `Esc` clears the input (second `Esc` closes/blurs).
+- Typing shows a dropdown (an ARIA combobox) of up to 8 fuzzy matches across **items and
+  recipes** (recipes visibly labeled "Recipe" with their ingredient count). Each item row shows
+  its category and the matched alias (`aka Parmesan`); items (and recipes) already on the list
+  are marked "on list". Matched characters are highlighted.
+- `↑`/`↓` move the highlight (clamped at the ends, no wrap-around); the highlight goes back to the
+  top result whenever the text changes. `Enter` picks it; mouse/tap picks too. `Esc` clears the
+  input (second `Esc` blurs it). `↓` with an empty input moves focus into the list (3.5).
 - Picking an item adds it to the list (manual source), clears the input, and keeps focus, so the
-  user can rattle off `milk⏎ eggs⏎ bananas⏎` without touching the mouse.
+  user can rattle off `milk⏎ eggs⏎ bananas⏎` without touching the mouse. Enter always acts on the
+  text currently in the box, and adds run one at a time in order, so fast typing never loses or
+  reorders an add. Feedback is quiet: the new row is briefly highlighted and scrolled into view
+  (and announced to screen readers); no toast.
 - **Inline note syntax:** `eggs, 2 dozen⏎` adds Eggs with note "2 dozen". Only text before the
-  first comma is searched.
+  first comma is searched; the dropdown shows the parsed note above the results.
 - Picking a recipe opens the **cull dialog** (3.4).
-- **Create row:** whenever the query does not exactly match an item name/alias, the dropdown ends
-  with `+ Create "…"`. If there are no fuzzy matches the create row is highlighted by default, so
-  `Enter` starts creation. `Shift+Enter` always jumps straight to creation.
+- **Create rows:** whenever the query does not exactly match (normalized) an item name/alias, the
+  dropdown ends with `+ Create item "…"` (and, in the List view, `+ Create recipe "…"`, see 3.7).
+  If there are no fuzzy matches the create row is highlighted by default, so `Enter` starts
+  creation. `Shift+Enter` always jumps straight to creation — except when the query exactly names
+  an existing item, where it shows a hint ("press Enter to add it") instead of a doomed create.
 - Re-adding an item already on the list is a no-op apart from adding the manual source / updating
   the note when one is given; it shows a subtle "already on list" toast, never an error.
+- Live sync never touches the input: the dropdown re-renders with the same text and highlight.
 - Usage stats (`use_count` +1, `last_used` = now) count the times an item is *put on* the list:
   a manual add bumps them when it creates the entry or gives a recipe-only entry its manual
   source; a recipe add bumps only the items it newly puts on the list. Re-adds never count twice.
@@ -131,12 +142,16 @@ editor for adding ingredients.
 Triggered from the create row. The dropdown turns into a category picker:
 `New item "Birthday candles" → choose category`.
 
-- Categories listed in walk order, numbered `1`–`9` for one-key selection.
-- Typing filters categories (fuzzy); `↑`/`↓` + `Enter` select; `0` or `Tab` = Uncategorized;
-  `Esc` returns to the search with the text intact.
+- Categories listed in walk order, numbered `1`–`9` for one-key selection (the number stays with
+  its category while filtering), then Uncategorized (`0`), which is always offered.
+- Typing (in the same input, now a category filter) filters categories (fuzzy); `↑`/`↓` +
+  `Enter` select; digits pick directly only while the filter is empty (so names can be typed);
+  `0` or `Tab` = Uncategorized; `Esc` (or `Backspace` on an empty filter) returns to the search
+  with the text intact.
 - Selection creates the item **and** adds it to the list (or to the recipe being edited) in one
-  step, then returns focus to the empty omnibar.
-- On mobile the same picker is a tappable list of category buttons.
+  step, with the inline note if one was typed, then returns focus to the empty omnibar. If the
+  create fails (e.g. the name is another item's alias) the typed text comes back.
+- On mobile the same picker is a tappable list of category rows (≥ 44 px) with a Back button.
 
 ### 3.3 Fuzzy search (P0) — must be excellent
 
@@ -190,13 +205,20 @@ Adding a recipe opens the **cull dialog** listing its ingredients as checkboxes:
   from that recipe is left (only removing the chip, clearing, or deleting the recipe drops it).
   Editing a recipe's ingredients doesn't change the list.
 - **Keyboard list navigation:** `↓` from an empty omnibar moves focus into the list; `↑`/`↓`/`j`/`k`
-  move; `Delete`/`Backspace`/`x` removes; `Enter`/`n` edits the note (`Enter` saves, `Esc`
-  cancels); `/` or `Esc` returns to the omnibar.
-- **Undo:** `Ctrl+Z` (when not typing in a field) and an Undo button in the removal toast revert
-  the last list change. Server keeps the last 50 list states in memory (lost on restart); only
-  list edits that changed the list are recorded. Deleting an item or recipe and merging items
-  clear the history (old states would reference them). Undo restores the list only, not usage.
-- **Clear list** button with confirmation.
+  move (`↑` on the first row returns to the omnibar; `Home`/`End` jump); `Delete`/`Backspace`/`x`
+  removes (focus moves to the next row, else the previous, else the omnibar);
+  `Enter`/`n` edits the note inline (`Enter` saves, `Esc` cancels, an empty note clears it;
+  clicking/tapping the row or its pencil button edits too); `/` or `Esc` returns to the omnibar.
+  Rows use a roving tabindex, so `Tab` enters the list once. Live sync keeps the focused row (or
+  its neighbour, if another device removed it) and an open note editor with its text.
+- **Undo:** `Ctrl+Z` (in the List view, when not typing in a field) and an Undo button in the
+  removal toasts ("Removed Milk", "Removed Tacos and 5 items", "Cleared the list") revert the last
+  list change. Server keeps the last 50 list states in memory (lost on restart); only list edits
+  that changed the list are recorded. Deleting an item or recipe and merging items clear the
+  history (old states would reference them). Undo restores the list only, not usage. Nothing to
+  undo shows a calm "Nothing to undo" toast.
+- **Clear list** button with confirmation; an empty list shows an empty state that teaches the
+  core loop ("Type an item and press Enter", the note syntax, Shift+Enter, `↓`).
 
 ### 3.6 Export & copy (P0)
 
@@ -220,10 +242,16 @@ Adding a recipe opens the **cull dialog** listing its ingredients as checkboxes:
     its items, at that category's position in the walk).
   - An empty list exports as empty text.
   - Recipe sources are **not** included in the export.
-- **Copy** button and `Ctrl+Shift+C` shortcut copy the text and show "Copied N items".
+- The List view shows a "Paste preview" of exactly what `GET /api/list/export` returns, refetched
+  on every state version change: a side column on wide screens (≥ 960 px), a collapsed section
+  below the list on narrower ones.
+- **Copy** button and `Ctrl+Shift+C` shortcut (anywhere in the List view, including while typing
+  in the omnibar) copy the text and show "Copied N items".
 - The app is served over plain HTTP on the LAN, where `navigator.clipboard` is unavailable on
   phones. Copy must fall back to a hidden-textarea + `document.execCommand('copy')`, and if that
-  fails, show the text pre-selected in a textarea for manual copy.
+  fails, show the text pre-selected in a textarea for manual copy (`public/js/clipboard.js`).
+  Copy uses the preview's text when it matches the current version, so the copy happens inside
+  the click (Safari only allows `execCommand('copy')` there); otherwise it fetches first.
 
 ### 3.7 Recipes view (P0)
 
@@ -232,7 +260,8 @@ Adding a recipe opens the **cull dialog** listing its ingredients as checkboxes:
   same omnibar (including inline item creation). Ingredient rows are removable by keyboard and tap.
 - Rename, delete (with confirmation), and "Add to list" (opens the cull dialog).
 - Creating a recipe from the List-view omnibar: the create row offers both
-  `+ Create item "…"` and `+ Create recipe "…"`; creating a recipe jumps to its editor.
+  `+ Create item "…"` and `+ Create recipe "…"`; creating a recipe (`POST /api/recipes` with the
+  typed name) jumps to its editor at `#/recipes/<id>`.
 
 ### 3.8 Items catalog view (P1)
 
@@ -350,8 +379,10 @@ public/
   js/store.js         client state, subscribe, live-sync polling
   js/fuzzy.js         pure fuzzy matcher (+ fuzzy-text.js, fuzzy-tiers.js, fuzzy.test.js)
   js/dom.js           h() element builder, highlight(), focus-preserving rerender()
-  js/components/      omnibar, category picker, cull dialog, toast, dialog
-  js/views/           list, recipes, items, categories
+  js/queue.js         serial mutation queue; js/clipboard.js: copy with fallbacks
+  js/omnibar-model.js js/list-model.js   pure logic behind the omnibar and the list
+  js/components/      omnibar (+ category picker), cull dialog, toast, dialog, copy dialog
+  js/views/           list (+ list-*.js), recipes, items, categories
 e2e/                  Playwright (own package.json; dev-only)
 scripts/check.ps1     run every check (also check.sh)
 docs/                 SPEC.md, TASKS.md, API.md

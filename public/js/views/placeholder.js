@@ -4,6 +4,9 @@
 import { search } from '../fuzzy.js';
 import { h, highlight, rerender } from '../dom.js';
 import { icon } from '../icons.js';
+import { noteArt } from '../components/empty.js';
+
+export { noteArt };
 
 const STATS = [
   ['list', 'On the list', (s) => s.list.entries.length],
@@ -11,25 +14,6 @@ const STATS = [
   ['recipes', 'Recipes', (s) => s.recipes.length],
   ['categories', 'Store sections', (s) => s.categories.length],
 ];
-
-/** A small sticky-note illustration for empty states. */
-export function noteArt() {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 64 64');
-  svg.setAttribute('class', 'empty-art');
-  svg.setAttribute('aria-hidden', 'true');
-  const parts = [
-    ['path', { class: 'note-paper', d: 'M12 10h40a2 2 0 0 1 2 2v28L40 54H12a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2z' }],
-    ['path', { class: 'note-fold', d: 'M40 54V42a2 2 0 0 1 2-2h12' }],
-    ['path', { class: 'note-line', d: 'M19 22h26M19 30h20M19 38h12' }],
-  ];
-  for (const [tag, attrs] of parts) {
-    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
-    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-    svg.append(el);
-  }
-  return svg;
-}
 
 /**
  * @param {object} config

@@ -143,7 +143,29 @@ fixed bottom bar (`--bottom-nav-h`); the main area already pads for it.
 - Playwright: routing + shortcut overlay + mobile viewport has no horizontal scroll.
 
 ## T5 — List view & omnibar
-- [ ] Done
+- [x] Done
+
+Notes: **Omnibar** = `createOmnibar(config)` in `public/js/components/omnibar.js` (header comment
+has an example); pure logic in `omnibar-model.js` (`searchModel`, `categoryOptions`,
+`keyAction`, `parseEntry`; unit-tested). For the recipe editor pass `{store, api, toast, queue,
+idPrefix: 'recipe', placeholder, recipes: false, createRecipe: false, itemBadge: (item) =>
+inRecipe ? 'in recipe' : null, onPickItem: (item, {note, created}) => api.updateRecipe(...)}`:
+`onPickItem` runs inside the queue (read the *latest* `store.state` recipe there, since adds can
+be queued back to back), new-item creation (`POST /api/items` + picker) is built in, and it
+returns `{el, input, focus({select}), clear(), mode, destroy()}` (call `destroy()` on unmount).
+Test ids: input `<idPrefix>-search`, popup `<idPrefix>-popup`, rows `omnibar-option` /
+`omnibar-create-item` / `omnibar-create-recipe` / `category-option[data-number]`, note banner
+`omnibar-note-text`. **Recipe picks are a T6 seam**: `addRecipe()` in `views/list.js` adds the
+recipe with the cull defaults (all but staples) + an Undo toast — replace it with the cull
+dialog. **`+ Create recipe "…"`** does `POST /api/recipes {name}` then navigates to
+`#/recipes/<id>` (params `['<id>']`): T6 opens that recipe's editor for this route (the router
+already passes it; implement `onParams` to avoid a remount). Reusable: `createQueue()`
+(`queue.js`) to serialize mutations; `copyText()` (`clipboard.js`); `noteArt()`
+(`components/empty.js`); CSS `.view-wide` (a view opts out of the 720 px centered column; the
+page is 1000 px wide now), `.only-keys`/`.only-touch`, `.omnibar-*`. Ctrl+Z / Ctrl+Shift+C are
+List-view only (moved to the List group in `shortcuts.js`). E2E: `tests/list.spec.ts` helpers
+(`resetList`, `addViaApi`, `uniqueName`, `group`, `row`) are worth copying; Windows' clipboard
+turns `\n` into `\r\n` on read-back, and the desktop clipboard test uses the real system clipboard.
 
 - Reusable omnibar component (SPEC §3.1) and category-picker new-item flow (§3.2).
 - List view (§3.5): grouping, notes, sources, recipe chips, keyboard navigation, removal, undo,

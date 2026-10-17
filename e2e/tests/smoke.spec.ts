@@ -7,6 +7,7 @@ test('page loads, connects and shows the list view', async ({ page }) => {
   await expect(page.getByTestId('app-title')).toContainText('Grocery list');
   await expect(page.getByTestId('sync-status')).toHaveAttribute('data-state', 'live');
   await expect(page.getByTestId('view-list')).toBeVisible();
-  await expect(page.getByTestId('state-version')).toHaveText(/^v\d+$/);
+  await expect(page.getByTestId('list-search')).toBeVisible();
+  await expect(page.getByTestId('list-summary')).not.toBeEmpty();
   // No console errors: asserted by the `consoleErrors` auto fixture.
 });
