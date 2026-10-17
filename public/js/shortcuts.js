@@ -1,0 +1,96 @@
+// Every keyboard shortcut in the SPEC, for the `?` overlay. Pure data.
+// `keys`: alternatives, shown separated by "/"; '+' joins keys pressed together.
+// `views`: views the group belongs to (shown first there); none = everywhere.
+// When a view implements (or changes) a shortcut, keep this list in sync. Views can also add
+// entries at runtime through their `shortcuts` property (see main.js).
+
+export const SHORTCUT_GROUPS = [
+  {
+    title: 'Everywhere',
+    items: [
+      { keys: ['Alt+1–4'], label: 'Switch view: List, Recipes, Items, Store order' },
+      { keys: ['/', 'Ctrl+K'], label: 'Focus the search box' },
+      { keys: ['?'], label: 'Show keyboard shortcuts' },
+      { keys: ['Esc'], label: 'Close a dialog or this overlay' },
+      { keys: ['Ctrl+Z'], label: 'Undo the last list change' },
+      { keys: ['Ctrl+Shift+C'], label: 'Copy the list' },
+    ],
+  },
+  {
+    title: 'Search box',
+    views: ['list', 'recipes'],
+    items: [
+      { keys: ['↑', '↓'], label: 'Move the highlight' },
+      { keys: ['Enter'], label: 'Add the highlighted item or recipe' },
+      { keys: ['Shift+Enter'], label: 'Create a new item' },
+      { keys: ['Enter'], label: 'After "eggs, 2 dozen": add with a note' },
+      { keys: ['Esc'], label: 'Clear the search; again to leave it' },
+    ],
+  },
+  {
+    title: 'New item: pick a category',
+    views: ['list', 'recipes'],
+    items: [
+      { keys: ['1–9'], label: 'Pick a numbered category' },
+      { keys: ['0', 'Tab'], label: 'Uncategorized' },
+      { keys: ['↑', '↓'], label: 'Move the highlight' },
+      { keys: ['Enter'], label: 'Pick the highlighted category' },
+      { keys: ['Esc'], label: 'Back to the search' },
+    ],
+  },
+  {
+    title: 'List',
+    views: ['list'],
+    items: [
+      { keys: ['↓'], label: 'From an empty search: move into the list' },
+      { keys: ['↑', '↓', 'j', 'k'], label: 'Move between items' },
+      { keys: ['Delete', 'Backspace', 'x'], label: 'Remove the item' },
+      { keys: ['Enter', 'n'], label: 'Edit the note (Enter saves, Esc cancels)' },
+      { keys: ['/', 'Esc'], label: 'Back to the search' },
+    ],
+  },
+  {
+    title: 'Adding a recipe',
+    views: ['list', 'recipes'],
+    items: [
+      { keys: ['↑', '↓'], label: 'Move between ingredients' },
+      { keys: ['Space'], label: 'Keep or skip the ingredient' },
+      { keys: ['a'], label: 'Toggle all' },
+      { keys: ['Enter'], label: 'Add to the list' },
+      { keys: ['Esc'], label: 'Cancel' },
+    ],
+  },
+  {
+    title: 'Recipes',
+    views: ['recipes'],
+    items: [{ keys: ['n'], label: 'New recipe' }],
+  },
+  {
+    title: 'Store order',
+    views: ['categories'],
+    items: [{ keys: ['Alt+↑', 'Alt+↓'], label: 'Move the category up or down the walk' }],
+  },
+];
+
+/**
+ * Orders the groups for a view: "Everywhere", then the view's groups, then the rest. Extra
+ * entries from the view (`{keys, label}`) join its first group, or a group named `viewTitle`.
+ * @param {string} viewId
+ * @param {string} viewTitle
+ * @param {{keys: string[], label: string}[]} [extra]
+ */
+export function groupsFor(viewId, viewTitle, extra = []) {
+  const everywhere = SHORTCUT_GROUPS.filter((g) => !g.views);
+  const mine = SHORTCUT_GROUPS.filter((g) => g.views?.includes(viewId)).map((g) => ({
+    ...g,
+    items: [...g.items],
+  }));
+  const others = SHORTCUT_GROUPS.filter((g) => g.views && !g.views.includes(viewId));
+  const fresh = extra.filter((e) => !mine.some((g) => g.items.some((i) => i.label === e.label)));
+  if (fresh.length) {
+    const target = mine.find((g) => g.title === viewTitle);
+    if (target) target.items.push(...fresh);
+    else mine.unshift({ title: viewTitle, views: [viewId], items: fresh });
+  }
+  return [...everywhere, ...mine, ...others];
+}

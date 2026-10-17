@@ -29,7 +29,16 @@ tests/common/mod.rs     TestApp::new()/demo() (temp data dir): get/post/put/dele
                         post_ok/put_ok/delete_ok (asserts success + consistency), post_err/...
                         (asserts status + nothing changed), restart()
 public/                 frontend, served from disk (no build step, no runtime deps)
-  index.html  css/app.css  js/main.js  js/fuzzy.js  js/*.test.js
+  index.html            app shell markup (header, tabs, view root, toast region)
+  css/app.css           design system: tokens (light/dark), components, responsive rules
+  js/main.js            bootstrap, routing, global shortcuts; VIEW CONTRACT documented on top
+  js/api.js  store.js   JSON API client (mutations -> store) / client state + live sync
+  js/fuzzy*.js          fuzzy search: fuzzy.js API, fuzzy-text.js normalization, fuzzy-tiers.js
+  js/dom.js  icons.js   h() element builder, highlight(), rerender() / inline SVG icons
+  js/router.js  shortcuts.js   hash routes / every SPEC shortcut for the `?` overlay
+  js/components/        toast.js, dialog.js (openModal, confirm), shortcut-help.js
+  js/views/             list, recipes, items, categories (+ placeholder.js until T5-T7)
+  js/*.test.js          node:test unit tests for the DOM-free modules
 e2e/                    Playwright Test (own package.json, uses system Microsoft Edge)
   playwright.config.ts  global-teardown.ts  tests/fixtures.ts  tests/*.spec.ts
 scripts/check.ps1|.sh   every check, in order, stops at first failure

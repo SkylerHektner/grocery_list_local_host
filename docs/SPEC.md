@@ -154,6 +154,15 @@ Pure function module (`public/js/fuzzy.js`), unit-tested with `node --test`. Req
   7. Typo-tolerant word match: Damerau–Levenshtein ≤ 1 for tokens of 4–7 chars, ≤ 2 for 8+
      (`parmesian` → "Parmesan", `brocoli` → "Broccoli", `tomatoe` → "Tomato")
 - Ties broken by usage (`use_count`, then `last_used`), then shorter name, then alphabetical.
+  Inside tiers 6 and 7 match quality comes first (acronym-like alignments over scattered ones;
+  fewer edits first).
+- Details that keep incremental typing sane (`public/js/fuzzy.js` documents them): punctuation
+  counts as a word break and apostrophes vanish (`half and half` = "Half-and-half",
+  `jerrys` → "Ben & Jerry's"); a one-character query only matches at word starts; tier 6 must
+  start at a word start and may only enter a later word at its first letter (`tomatoe` does not
+  match "Tomato p**a**st**e**"); tier 7 also lets the *last* token (5+ chars, still being typed)
+  be within the typo budget of a word *prefix* (`strawv` → "Strawberries"). An empty query
+  matches nothing.
 - Returns match ranges so the UI can highlight matched characters.
 - Fast: < 5 ms for 2,000 items on a laptop.
 
@@ -257,9 +266,11 @@ Adding a recipe opens the **cull dialog** listing its ingredients as checkboxes:
 - `Alt+1`…`Alt+4` switch views; `/` or `Ctrl+K` focuses the current view's search box; `?` opens
   a keyboard shortcut overlay.
 - Toast area for confirmations, errors (with the server's error message), and Undo.
+- The header shows a live-sync indicator (Live / Offline) and a keyboard button that opens the
+  shortcut overlay (for touch users).
 - Light and dark themes via `prefers-color-scheme`.
-- Responsive: single column ≤ 700 px, sticky omnibar, tap targets ≥ 44 px, no horizontal scroll at
-  360 px wide.
+- Responsive: single column ≤ 700 px with the view tabs as a bottom tab bar, sticky omnibar, tap
+  targets ≥ 44 px, dialogs as bottom sheets, no horizontal scroll at 360 px wide.
 
 ### 3.12 Hosting (P0)
 
@@ -333,10 +344,12 @@ tests/                Rust integration tests (tower::ServiceExt::oneshot against
 public/
   index.html
   css/app.css
-  js/main.js          bootstrap, routing, global shortcuts
+  js/main.js          bootstrap, routing, global shortcuts (view contract)
+  js/router.js        hash routes; js/shortcuts.js: shortcut list for the ? overlay
   js/api.js           fetch wrapper; mutations return state
   js/store.js         client state, subscribe, live-sync polling
-  js/fuzzy.js         pure fuzzy matcher (+ fuzzy.test.js, node --test)
+  js/fuzzy.js         pure fuzzy matcher (+ fuzzy-text.js, fuzzy-tiers.js, fuzzy.test.js)
+  js/dom.js           h() element builder, highlight(), focus-preserving rerender()
   js/components/      omnibar, category picker, cull dialog, toast, dialog
   js/views/           list, recipes, items, categories
 e2e/                  Playwright (own package.json; dev-only)

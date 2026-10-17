@@ -1,12 +1,12 @@
 import { test, expect } from './fixtures';
 
-test('page loads and shows server health', async ({ page }) => {
+test('page loads, connects and shows the list view', async ({ page }) => {
   await page.goto('/');
 
   await expect(page).toHaveTitle('Grocery list');
-  await expect(page.getByTestId('app-title')).toHaveText('Grocery list — coming soon');
-  const health = page.getByTestId('health-status');
-  await expect(health).toHaveAttribute('data-state', 'ok');
-  await expect(health).toHaveText(/^Server OK · version \d+$/);
+  await expect(page.getByTestId('app-title')).toContainText('Grocery list');
+  await expect(page.getByTestId('sync-status')).toHaveAttribute('data-state', 'live');
+  await expect(page.getByTestId('view-list')).toBeVisible();
+  await expect(page.getByTestId('state-version')).toHaveText(/^v\d+$/);
   // No console errors: asserted by the `consoleErrors` auto fixture.
 });

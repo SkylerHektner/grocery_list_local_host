@@ -94,7 +94,44 @@ restarts clear it; undo restores the list only. Logic lives in `src/catalog.rs`,
 - Write `docs/API.md` with request/response examples.
 
 ## T4 — Frontend foundation
-- [ ] Done
+- [x] Done
+
+Notes: **View contract** is documented at the top of `public/js/main.js`: a view module
+default-exports `{id, title, mount(container, ctx), unmount?, focusSearch?, onParams?,
+shortcuts?}`; `ctx = {store, api, params, toast, confirm, navigate, subscribe, listen,
+onCleanup}` (subscribe/listen/onCleanup auto-clean on unmount; state is loaded before mount).
+Replace `public/js/views/{list,recipes,items,categories}.js` (placeholders built by
+`views/placeholder.js`, which can be deleted once all four are real). Global keys run on
+document keydown and skip events a view `preventDefault()`-ed; `/` and `?` skip text fields;
+everything is suspended while a modal is open (`isModalOpen()`). SPEC shortcuts for the `?`
+overlay live in `js/shortcuts.js` — update it when you implement one. **Store/API:**
+`store.state` = derived snapshot (`itemsById`, `categoriesById`, `categoryIndex` (walk position),
+`recipesById`, `entriesByItemId`, `listRecipeIds`, plus raw arrays; `walkIndex(state, catId)`
+sorts Uncategorized last); `api.*` mutations (`addToList(itemId, note?)`, `setNote`,
+`removeFromList`, `addRecipeToList(recipeId, itemIds)`, `undo`, `createItem({...})`, ... — full
+list in `api.js`) push the new state into the store and resolve `{state, id}`; failures toast the
+server message automatically and reject with `ApiError` (`.status`), so just `try/catch` to
+restore UI; `api.quiet.*` skips the toast for inline error display. Live sync polls every 3 s
+(`createLiveSync` in `store.js`); keep typing safe with `rerender(container, build)` from
+`dom.js` (restores focus/value/selection by `data-key`) or by keeping inputs outside re-rendered
+subtrees. **Fuzzy:** `search(query, candidates, {name, aliases, useCount, lastUsed, limit})` →
+`[{item, tier, quality, field, alias, text, ranges}]`; render with `highlight(r.text, r.ranges)`
+(dom.js); empty query → `[]`; `matchText(query, text)` for single strings; `TIER` constants.
+**UI:** `h(tag, attrs, ...children)` (`testid:` → data-testid, `onClick:` listeners, text is
+always safe); `toast(msg, {variant: 'info'|'success'|'error', action: {label, onClick},
+duration})`; `await confirm({title, message, confirmLabel, danger})`; `openModal({...})` for
+custom dialogs (bottom sheet ≤ 700 px); `icon(name)` from `icons.js`. **CSS vocabulary** (top of
+`css/app.css`): `.view .view-head .view-title .view-lead .card .sticky-bar .stack .cluster`,
+`.btn(-primary|-ghost|-danger|-icon|-sm) .input .search>.search-input .checkbox`,
+`.listbox>.option(.is-active|[aria-selected=true]) .option-label .option-alias .option-meta
+.option-category(.is-uncategorized) .option-num .option-create .option-empty`,
+`.group-header .group-count .rows>.row(.is-active) .row-name .row-note .row-tags .row-actions`,
+`.tag(-accent|-warm|-danger) .chip .chip-label .chip-remove .kbd mark .empty .empty-art
+.empty-title .empty-body .muted`; tokens are `--*` custom properties (light + dark). E2E:
+`e2e/tests/shell.spec.ts` shows how to call app modules from a test (`inPage()` with a string
+body, since the TS transform rewrites `import()` in functions); a 409 in the browser logs a
+console error, so clear `consoleErrors` after expected failures. On ≤ 700 px the tabs are a
+fixed bottom bar (`--bottom-nav-h`); the main area already pads for it.
 
 - App shell: header with view tabs, hash routing, `Alt+1..4`, `?` shortcut overlay, toast system
   (with action button for Undo), confirm dialog component.
