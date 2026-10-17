@@ -268,7 +268,7 @@ Do these one by one (each its own commit; a fresh session can pick up the next u
 
 - [x] Light mode by default (ignores the OS preference) + header light/dark toggle.
 - [x] Bigger category group headers on the List view ("PRODUCE 16").
-- [ ] List view items in a grid of tiles per category instead of one long column.
+- [x] List view items in a grid of tiles per category instead of one long column.
 - [ ] Remove the paste preview side panel from the List view.
 
 Notes: Theme: `public/js/theme.js` (+ `theme.test.js`); dark palette is `:root[data-theme="dark"]`
@@ -277,3 +277,7 @@ absent; an inline `<head>` script in `index.html` applies it before first paint;
 `data-testid="theme-toggle"` ("Dark mode", `aria-pressed`). E2E: `shell.spec.ts`.
 Headers: only `.list-group .group-header` changed (text-lg, full ink, hairline, count pill); the
 shared small `.group-header` caption (recipe editor, cull dialog) is untouched.
+Grid: `.list-group .rows` is a CSS grid (`auto-fill, minmax(190px)`; one column on phones); a
+tile being note-edited spans the line. Keys: ↑/↓ = geometric `gridNeighbor()` in `list-model.js`
+(nearest column on the next line, across groups), ←/→ and j/k = reading order. Once the paste
+preview is gone the List card gets wider, so expect more columns.

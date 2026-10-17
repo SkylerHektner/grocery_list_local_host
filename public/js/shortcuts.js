@@ -41,7 +41,8 @@ export const SHORTCUT_GROUPS = [
     views: ['list'],
     items: [
       { keys: ['↓'], label: 'From an empty search: move into the list' },
-      { keys: ['↑', '↓', 'j', 'k'], label: 'Move between items (↑ on the first: back to the search)' },
+      { keys: ['↑', '↓'], label: 'Move up / down the grid (↑ on the top line: back to the search)' },
+      { keys: ['←', '→', 'j', 'k'], label: 'Previous / next item' },
       { keys: ['Home', 'End'], label: 'First / last item' },
       { keys: ['Delete', 'Backspace', 'x'], label: 'Remove the item' },
       { keys: ['Enter', 'n'], label: 'Edit the note (Enter saves, Esc cancels)' },

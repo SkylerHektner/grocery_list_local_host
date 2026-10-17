@@ -7,6 +7,7 @@ import {
   compareNames,
   displayOrder,
   fallbackFocus,
+  gridNeighbor,
   groupEntries,
   neighborAfterRemoval,
   plural,
@@ -135,4 +136,32 @@ test('plural and summary', () => {
   assert.equal(summary(state([manual(10)])), '1 item');
   assert.equal(summary(state([manual(10), manual(11)], [20])), '2 items · 1 recipe');
   assert.equal(summary(state([], [20, 21])), '0 items · 2 recipes');
+});
+
+describe('gridNeighbor', () => {
+  // Two groups: A has 3 tiles over 2 columns (a1 a2 / a3), B has 2 (b1 b2), 100 px tiles.
+  const box = (top, left) => ({ top, left, width: 100 });
+  const boxes = [box(0, 0), box(0, 110), box(50, 0), box(150, 0), box(150, 110)];
+
+  test('down goes to the next line, nearest column, across groups', () => {
+    assert.equal(gridNeighbor(boxes, 0, 1), 2); // a1 -> a3
+    assert.equal(gridNeighbor(boxes, 1, 1), 2); // a2 -> a3 (the only tile on that line)
+    assert.equal(gridNeighbor(boxes, 2, 1), 3); // a3 -> b1
+    assert.equal(gridNeighbor(boxes, 4, 1), null); // bottom line
+  });
+
+  test('up goes to the line above, nearest column; null on the top line', () => {
+    assert.equal(gridNeighbor(boxes, 4, -1), 2); // b2 -> a3
+    assert.equal(gridNeighbor(boxes, 2, -1), 0); // a3 -> a1
+    assert.equal(gridNeighbor(boxes, 1, -1), null);
+  });
+
+  test('sub-pixel differences count as the same line; a single column is plain next/previous', () => {
+    const wobbly = [box(0, 0), box(0.6, 110), box(50.4, 110)];
+    assert.equal(gridNeighbor(wobbly, 0, 1), 2);
+    const column = [box(0, 0), box(40, 0), box(80, 0)];
+    assert.equal(gridNeighbor(column, 0, 1), 1);
+    assert.equal(gridNeighbor(column, 2, -1), 1);
+    assert.equal(gridNeighbor(column, 5, 1), null);
+  });
 });

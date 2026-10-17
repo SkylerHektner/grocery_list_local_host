@@ -4,7 +4,9 @@
 // (rerender() in dom.js), and the focused row's neighbour takes focus when another device
 // removes it.
 //
-// Keys on a focused row: ↑/↓/j/k move (↑ on the first row: back to the search), Home/End,
+// Each group's rows are a wrapped grid of tiles (CSS). Keys on a focused tile: ↑/↓ move a line
+// up/down the grid to the nearest column (↑ on the top line: back to the search), ←/→ and j/k
+// the previous/next tile in reading order (k on the first: back to the search), Home/End,
 // Delete/Backspace/x remove (focus moves to the next row, else the previous), Enter/n edit the
 // note (Enter saves, Esc cancels, empty clears), / or Esc back to the search.
 //
@@ -12,7 +14,7 @@
 // failure (the API already toasted it) just re-renders the server's state.
 
 import { h, isTypingTarget, rerender } from '../dom.js';
-import { displayOrder, fallbackFocus, groupEntries, neighborAfterRemoval } from '../list-model.js';
+import { displayOrder, fallbackFocus, gridNeighbor, groupEntries, neighborAfterRemoval } from '../list-model.js';
 import { emptyView, groupView } from './list-row-view.js';
 
 const FLASH_MS = 1600;
@@ -192,13 +194,21 @@ export function createListRows({ store, api, queue, toast, focusSearch, undo }) 
     const index = order.indexOf(id);
     switch (e.key) {
       case 'ArrowDown':
+      case 'ArrowUp': {
+        const boxes = order.map((rowId) => rowEl(rowId)?.getBoundingClientRect() ?? { top: 0, left: 0, width: 0 });
+        const next = gridNeighbor(boxes, index, e.key === 'ArrowDown' ? 1 : -1);
+        if (next !== null) focusRow(order[next]);
+        else if (e.key === 'ArrowUp') focusSearch();
+        break;
+      }
+      case 'ArrowRight':
       case 'j':
         if (index < order.length - 1) focusRow(order[index + 1]);
         break;
-      case 'ArrowUp':
+      case 'ArrowLeft':
       case 'k':
         if (index > 0) focusRow(order[index - 1]);
-        else focusSearch();
+        else if (e.key === 'k') focusSearch();
         break;
       case 'Home':
         focusRow(order[0]);

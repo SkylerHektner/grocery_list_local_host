@@ -78,6 +78,34 @@ export function displayOrder(groups) {
 }
 
 /**
+ * ↑/↓ in the wrapped tile grid: the nearest line above/below `index` (it may be in another
+ * group), and on it the tile whose horizontal centre is closest (the first one on a tie).
+ * @param {{top: number, left: number, width: number}[]} boxes  tiles in display order
+ * @param {number} index
+ * @param {1 | -1} dir  1 = down, -1 = up
+ * @returns {number | null}  an index into `boxes`, or null at the top/bottom line
+ */
+export function gridNeighbor(boxes, index, dir) {
+  const SAME_LINE = 2; // px of tolerance (sub-pixel layout)
+  const from = boxes[index];
+  if (!from) return null;
+  const center = (b) => b.left + b.width / 2;
+  let line = null;
+  for (const b of boxes) {
+    const ahead = dir > 0 ? b.top > from.top + SAME_LINE : b.top < from.top - SAME_LINE;
+    if (ahead && (line === null || (dir > 0 ? b.top < line : b.top > line))) line = b.top;
+  }
+  if (line === null) return null;
+  let best = null;
+  boxes.forEach((b, i) => {
+    if (Math.abs(b.top - line) > SAME_LINE) return;
+    const distance = Math.abs(center(b) - center(from));
+    if (best === null || distance < best.distance) best = { i, distance };
+  });
+  return best.i;
+}
+
+/**
  * Where focus goes when `id` leaves the list: the next row, else the previous one, else null.
  * @param {number[]} order  display order before the removal
  * @param {number} id

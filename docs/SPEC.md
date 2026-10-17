@@ -226,8 +226,12 @@ name, with category headers):
   recipe stay). Removing an entry removes it whatever its sources; chips stay even when no entry
   from that recipe is left (only removing the chip, clearing, or deleting the recipe drops it).
   Editing a recipe's ingredients doesn't change the list.
-- **Keyboard list navigation:** `↓` from an empty omnibar moves focus into the list; `↑`/`↓`/`j`/`k`
-  move (`↑` on the first row returns to the omnibar; `Home`/`End` jump); `Delete`/`Backspace`/`x`
+- **Layout:** each category's entries are a grid of tiles in reading order (as many columns as
+  fit, at least 190 px wide; one column on a phone); a tile with its note editor open spans the line.
+- **Keyboard list navigation:** `↓` from an empty omnibar moves focus into the list; `↑`/`↓` move a
+  line up/down the grid to the nearest column (`↑` on the top line returns to the omnibar);
+  `←`/`→` and `j`/`k` move to the previous/next tile in reading order (`k` on the first returns
+  to the omnibar); `Home`/`End` jump; `Delete`/`Backspace`/`x`
   removes (focus moves to the next row, else the previous, else the omnibar);
   `Enter`/`n` edits the note inline (`Enter` saves, `Esc` cancels, an empty note clears it;
   clicking/tapping the row or its pencil button edits too); `/` or `Esc` returns to the omnibar.

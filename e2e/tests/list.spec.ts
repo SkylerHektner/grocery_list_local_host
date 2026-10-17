@@ -282,7 +282,64 @@ test('keyboard culling: ↓ into the list, Delete twice, Ctrl+Z restores one', a
   await expect(input).toBeFocused();
 });
 
-test('note editing by keyboard: Enter saves, Esc cancels, empty clears', async ({ page, request }) => {
+test('items are a grid of tiles: ↑/↓ follow the columns, ←/→ go in reading order', async ({ page, request }) => {
+  await resetList(request);
+  const produce = ['Avocados', 'Bananas', 'Bell peppers', 'Broccoli', 'Carrots', 'Cilantro', 'Garlic'];
+  for (const name of [...produce, 'Milk']) await addViaApi(request, name);
+  await open(page);
+  const input = await omnibar(page);
+  const box = async (name: string) => (await row(page, name).boundingBox())!;
+  const focusedName = () =>
+    page.evaluate(() => document.activeElement?.querySelector('[data-testid="row-name"]')?.textContent ?? null);
+
+  // Desktop: several tiles share a line; a phone: one column. Either way ↓ lands on the tile on
+  // the next line that is closest to the column it came from.
+  const [first, second] = [await box('Avocados'), await box('Bananas')];
+  const columns = Math.abs(first.y - second.y) < 2 ? 2 : 1;
+  if (page.viewportSize()!.width > 700) expect(columns).toBe(2);
+
+  await page.keyboard.press('ArrowDown');
+  await expect(row(page, 'Avocados')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  const below = (await focusedName())!;
+  const belowBox = await box(below);
+  expect(belowBox.y).toBeGreaterThan(first.y + 2);
+  expect(Math.abs(belowBox.x - first.x)).toBeLessThan(2);
+  if (columns === 1) expect(below).toBe('Bananas');
+  else expect(below).not.toBe('Bananas');
+
+  // → / ← (and j / k) step through tiles in reading order.
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(focusedName).toBe(produce[produce.indexOf(below) - 1]);
+  await page.keyboard.press('Home');
+  await page.keyboard.press('ArrowRight');
+  await expect(row(page, 'Bananas')).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft'); // clamped at the first tile
+  await expect(row(page, 'Avocados')).toBeFocused();
+
+  // ↓ from the last line of Produce goes into Dairy & Eggs; ↑ from the top line: the search.
+  await row(page, 'Garlic').focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(row(page, 'Milk')).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(async () => produce.includes((await focusedName()) ?? '')).toBe(true);
+  await row(page, 'Bananas').focus();
+  if (columns === 2) {
+    await page.keyboard.press('ArrowUp');
+    await expect(input).toBeFocused();
+  }
+
+  // A tile with its note editor open takes the whole line.
+  await row(page, 'Bananas').focus();
+  await page.keyboard.press('Enter');
+  const editing = await box('Bananas');
+  const body = (await page.getByTestId('list-body').boundingBox())!;
+  expect(editing.width).toBeGreaterThan(body.width * 0.9);
+  await page.keyboard.press('Escape');
+});
+
+test('note editing by keyboard: Enter saves, Esc cancels, empty clears',async ({ page, request }) => {
   await resetList(request);
   await addViaApi(request, 'Milk');
   await open(page);
