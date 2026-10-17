@@ -67,9 +67,6 @@ const row = (page: Page, name: string) =>
   page.getByTestId('list-row').filter({ has: page.getByTestId('row-name').getByText(name, { exact: true }) });
 const toast = (page: Page, text: string) => page.getByTestId('toast').filter({ hasText: text });
 
-async function previewText(page: Page) {
-  return page.getByTestId('export-preview').evaluate((el) => el.textContent);
-}
 
 test('rapid keyboard entry: four type+Enter in a row all land, grouped in walk order', async ({ page, request }) => {
   await resetList(request);
@@ -418,7 +415,7 @@ test('clear list asks first; cancel keeps it, confirm empties it (with Undo)', a
   await expect(page.getByTestId('list-empty')).toBeVisible();
   await expect(page.getByTestId('list-empty')).toContainText('Your list is empty');
   await expect(page.getByTestId('clear-list')).toBeDisabled();
-  await expect.poll(() => previewText(page)).toBe('');
+  await expect.poll(async () => (await request.get('/api/list/export')).text()).toBe('');
   await expect.poll(async () => (await state(request)).list.entries.length).toBe(0);
 
   await toast(page, 'Cleared the list').getByTestId('toast-action').click();
@@ -446,7 +443,8 @@ test('copy puts the exact export text on the clipboard (button and Ctrl+Shift+C)
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await addExportFixture(request);
   await open(page);
-  await expect.poll(() => previewText(page)).toBe(EXPECTED_EXPORT);
+  await expect(page.getByTestId('list-row')).toHaveCount(4);
+  await expect(page.getByTestId('export-panel')).toHaveCount(0); // no on-screen paste preview
 
   // The system clipboard on Windows stores line breaks as \r\n.
   const clipboard = async () =>
@@ -466,7 +464,7 @@ test('copy puts the exact export text on the clipboard (button and Ctrl+Shift+C)
   await expect(input).toBeFocused();
 });
 
-test('copy without the Clipboard API (plain-HTTP phone): fallbacks work, preview is exact', async ({ page, request }) => {
+test('copy without the Clipboard API (plain-HTTP phone): fallbacks work, text is exact', async ({ page, request }) => {
   // What a phone sees over plain HTTP on the LAN: no navigator.clipboard.
   await page.addInitScript(() => {
     Object.defineProperty(Navigator.prototype, 'clipboard', { get: () => undefined, configurable: true });
@@ -474,13 +472,7 @@ test('copy without the Clipboard API (plain-HTTP phone): fallbacks work, preview
   await addExportFixture(request);
   await open(page);
 
-  const toggle = page.getByTestId('export-toggle');
-  if (await toggle.isVisible()) {
-    await expect(page.getByTestId('export-preview')).toBeHidden(); // collapsed on narrow screens
-    await toggle.click();
-  }
-  await expect(page.getByTestId('export-preview')).toBeVisible();
-  await expect.poll(() => previewText(page)).toBe(EXPECTED_EXPORT);
+  await expect(page.getByTestId('list-row')).toHaveCount(4);
 
   // execCommand('copy'), or the manual dialog if the browser refuses: never an error.
   await page.getByTestId('copy-list').click();

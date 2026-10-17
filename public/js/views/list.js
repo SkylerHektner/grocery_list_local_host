@@ -1,7 +1,7 @@
-// List view (SPEC §3.1, §3.2, §3.5, §3.6): the omnibar, recipe chips, the grouped list and the
-// export preview with copy. Pieces: components/omnibar.js, components/cull-dialog.js (picking a
-// recipe), views/list-chips.js, views/list-rows.js (rows, keyboard navigation, notes, removal;
-// DOM in list-row-view.js), views/list-export.js (preview), clipboard.js (copy fallbacks).
+// List view (SPEC §3.1, §3.2, §3.5, §3.6): the omnibar, recipe chips, the grouped list and
+// copy. Pieces: components/omnibar.js, components/cull-dialog.js (picking a recipe),
+// views/list-chips.js, views/list-rows.js (rows, keyboard navigation, notes, removal; DOM in
+// list-row-view.js), views/list-export.js (export text cache), clipboard.js (copy fallbacks).
 //
 // Every mutation goes through one queue (queue.js), so rapid adds, removals and undos land in
 // order. Feedback is quiet: an added row is highlighted and scrolled into view (and announced to
@@ -21,7 +21,7 @@ import { addRecipeWithCull } from '../components/cull-dialog.js';
 import { stickyBar } from '../components/sticky-bar.js';
 import { createRecipeChips } from './list-chips.js';
 import { createListRows } from './list-rows.js';
-import { createExportPanel } from './list-export.js';
+import { createExportCache } from './list-export.js';
 
 /** @type {{omnibar: ReturnType<typeof createOmnibar>} | null} */
 let current = null;
@@ -130,7 +130,7 @@ function mount(container, ctx) {
       toast('The list is empty: nothing to copy');
       return;
     }
-    let text = exportPanel.current();
+    let text = exportCache.current();
     if (text === null) {
       try {
         text = await api.exportText();
@@ -172,7 +172,7 @@ function mount(container, ctx) {
     focusSearch: () => omnibar.focus(),
   });
 
-  const exportPanel = createExportPanel({ store, api });
+  const exportCache = createExportCache({ store, api });
 
   const summaryEl = h('p', { class: 'view-lead', testid: 'list-summary', 'aria-live': 'off' });
   const clearButton = h(
@@ -211,22 +211,17 @@ function mount(container, ctx) {
   container.append(
     h(
       'div',
-      { class: 'list-layout' },
+      { class: 'list-main' },
       h(
-        'div',
-        { class: 'list-main' },
-        h(
-          'header',
-          { class: 'view-head list-head' },
-          h('div', { class: 'list-head-text' }, h('h1', { class: 'view-title', testid: 'view-title' }, 'List'), summaryEl),
-          h('div', { class: 'list-actions' }, clearButton, copyButton),
-        ),
-        sentinel,
-        bar,
-        chips.el,
-        h('div', { class: 'card list-card' }, rows.el),
+        'header',
+        { class: 'view-head list-head' },
+        h('div', { class: 'list-head-text' }, h('h1', { class: 'view-title', testid: 'view-title' }, 'List'), summaryEl),
+        h('div', { class: 'list-actions' }, clearButton, copyButton),
       ),
-      exportPanel.el,
+      sentinel,
+      bar,
+      chips.el,
+      h('div', { class: 'card list-card' }, rows.el),
     ),
     announcer,
   );
@@ -240,7 +235,7 @@ function mount(container, ctx) {
     chips.render();
     rows.highlight(addedEntries(prev, state));
     rows.render();
-    exportPanel.update();
+    exportCache.update();
   });
 
   ctx.listen(document, 'keydown', (e) => {
@@ -258,7 +253,7 @@ function mount(container, ctx) {
 
   ctx.onCleanup(() => {
     omnibar.destroy();
-    exportPanel.destroy();
+    exportCache.destroy();
   });
 
   current = { omnibar };

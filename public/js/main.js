@@ -27,7 +27,7 @@
 //   onCleanup(fn),                 run on unmount
 // }
 // The section is a centered 720 px column; add the class `view-wide` to it for the full page
-// width (the List view does, for its side preview).
+// width (the List view does, for its tile grid).
 // Live-sync re-renders must not clobber typing: keep inputs outside re-rendered subtrees and/or
 // use rerender() from dom.js. Keyboard: views handle keys on their own elements and call
 // preventDefault() on keys they consume; the global handler below then ignores the event.

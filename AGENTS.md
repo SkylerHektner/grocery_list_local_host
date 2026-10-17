@@ -57,7 +57,7 @@ public/                 frontend, served from disk (no build step, no runtime de
                         name-dialog.js (promptName), copy-dialog.js, sticky-bar.js,
                         pick-dialog.js (openPicker: filterable "pick one" modal, digit keys)
   js/views/list*.js     List view: list.js + list-rows/list-row-view (rows), list-chips,
-                        list-export (paste preview)
+                        list-export (export text cache for Copy)
   js/views/recipe*.js   Recipes view: recipes.js (routes #/recipes and #/recipes/<id>, shared
                         queue), recipes-index(-view).js, recipe-editor.js, recipe-ingredients.js
   js/views/items*.js    Items view (#/items, #/items/uncategorized): items.js (filter, chips,

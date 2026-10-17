@@ -268,15 +268,14 @@ name, with category headers):
     its items, at that category's position in the walk).
   - An empty list exports as empty text.
   - Recipe sources are **not** included in the export.
-- The List view shows a "Paste preview" of exactly what `GET /api/list/export` returns, refetched
-  on every state version change: a side column on wide screens (≥ 960 px), a collapsed section
-  below the list on narrower ones.
+- The List view has no on-screen paste preview; it keeps exactly what `GET /api/list/export`
+  returns cached in the background, refetched on every state version change.
 - **Copy** button and `Ctrl+Shift+C` shortcut (anywhere in the List view, including while typing
   in the omnibar) copy the text and show "Copied N items".
 - The app is served over plain HTTP on the LAN, where `navigator.clipboard` is unavailable on
   phones. Copy must fall back to a hidden-textarea + `document.execCommand('copy')`, and if that
   fails, show the text pre-selected in a textarea for manual copy (`public/js/clipboard.js`).
-  Copy uses the preview's text when it matches the current version, so the copy happens inside
+  Copy uses the cached text when it matches the current version, so the copy happens inside
   the click (Safari only allows `execCommand('copy')` there); otherwise it fetches first.
 
 ### 3.7 Recipes view (P0)

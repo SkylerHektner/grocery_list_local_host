@@ -175,7 +175,6 @@ test('tap targets are at least 44 px in every view and dialog', async ({ page, r
   ).toBeTruthy();
 
   await open(page, '#/list');
-  await page.getByTestId('export-toggle').tap();
   expect(await smallTargets(page), 'list').toEqual([]);
   await listRow(page, 'Milk').getByTestId('row-name').tap(); // note editor
   await expect(page.getByTestId('note-input')).toBeVisible();
@@ -273,8 +272,8 @@ test('the omnibar stays in reach on a long list; the tab bar never covers rows o
 
   // The last thing on the page ends above the tab bar.
   const tabs = (await page.getByTestId('tabs').boundingBox())!;
-  const panel = (await page.getByTestId('export-panel').boundingBox())!;
-  expect(panel.y + panel.height).toBeLessThanOrEqual(tabs.y);
+  const body = (await page.getByTestId('list-body').boundingBox())!;
+  expect(body.y + body.height).toBeLessThanOrEqual(tabs.y);
 
   // So does a toast.
   await page.getByTestId('list-row').last().getByTestId('remove-entry').tap();
