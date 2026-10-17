@@ -42,13 +42,19 @@ and say which in the commit message. Task breakdown and status live in [TASKS.md
   mutation writes the file atomically (write `db.json.tmp`, then rename over `db.json`).
 - `schema_version` field (start at 1). Loading an unknown newer version is a hard error; older
   versions are migrated in code.
-- `version` field: monotonic revision counter, incremented on every successful mutation. Used for
-  live sync.
-- On startup, if `db.json` exists, copy it to `<data_dir>/backups/db-<unix_seconds>.json`, keeping
-  the 10 most recent backups.
+- `version` field: monotonic revision counter, incremented on every successful mutation (a fresh
+  DB starts at 0). Used for live sync. A failed mutation (validation error or failed save)
+  changes nothing in memory or on disk.
+- On startup, if `db.json` exists and loads, copy it to
+  `<data_dir>/backups/db-<unix_seconds>.json` (`db-<unix_seconds>-<n>.json` if several starts
+  happen in one second), keeping the 10 most recent backups.
+- A `db.json` that cannot be read, is not valid JSON, lacks `schema_version` or has invalid data
+  is a hard startup error naming the file; it is never replaced and never backed up (so restarts
+  on a broken file cannot rotate the good backups out).
 - A missing `db.json` creates a fresh DB seeded with default categories in a typical walk order:
   Produce, Bakery, Deli & Cheese, Meat & Seafood, Dairy & Eggs, Frozen, Pantry, Snacks,
-  Beverages, Household, Personal Care.
+  Beverages, Household, Personal Care. With `--demo`, a fresh DB also gets the demo catalog
+  (`src/demo.rs`: ~40 items incl. staples, aliases and two uncategorized items, 4 recipes).
 - No legacy import: the old `data/*.ron` files are ignored.
 
 ### 2.2 Shape (illustrative)
@@ -76,17 +82,21 @@ and say which in the commit message. Task breakdown and status live in [TASKS.md
 }
 ```
 
-Timestamps are unix seconds (no date-time crate needed). IDs come from one shared `next_id`
-counter.
+Timestamps are unix seconds (no date-time crate needed); `last_used` is 0 for never-used items.
+A missing note is `null`. IDs come from one shared `next_id` counter.
 
 ### 2.3 Names & validation
 
 - Normalize every name/alias: trim, collapse internal whitespace to single spaces, uppercase the
   first character, leave the rest as typed ("BBQ sauce" stays "BBQ sauce").
-- Length 1–80 characters after normalization.
-- Item names are unique case-insensitively; an alias may not equal another item's name.
-  Recipe names unique; category names unique (all case-insensitive).
-- Notes: trimmed, max 80 chars, empty string ⇒ no note.
+- Length 1–80 characters (not bytes) after normalization; control characters are rejected.
+- Item names are unique case-insensitively; an alias may not equal another item's name (and a
+  name may not equal another item's alias). Two items may share an alias. Recipe names unique;
+  category names unique (all case-insensitive).
+- Aliases: blank ones are dropped, as are case-insensitive duplicates and aliases equal to the
+  item's own name.
+- Notes: trimmed and internal whitespace collapsed (a note never spans lines in the export), max
+  80 chars, no control characters, empty ⇒ no note.
 
 ---
 
@@ -253,7 +263,8 @@ Adding a recipe opens the **cull dialog** listing its ingredients as checkboxes:
 ## 4. HTTP API
 
 All bodies are JSON. Errors are `{"error": "<human readable message>"}` with a fitting status
-(400 validation, 404 unknown id, 409 conflict/duplicate). **Every mutation returns
+(400 validation or malformed body, 404 unknown id/route, 405 wrong method, 409
+conflict/duplicate, 500 save failed). **Every mutation returns
 `{"state": <Snapshot>, "id": <affected or created id | null>}`**, so the client never needs a
 follow-up fetch. `Snapshot` = `{version, categories, items, recipes, list}`.
 
@@ -292,12 +303,13 @@ follow-up fetch. `Snapshot` = `{version, categories, items, recipes, list}`.
 Cargo.toml            lib + bin crate
 src/
   main.rs             parse config, load store, bind, print LAN URL
-  lib.rs              pub fn app(state) -> Router  (used by main and tests)
+  lib.rs              pub fn app(state, static_dir) -> Router  (used by main and tests)
   config.rs           CLI flag / env var parsing (no clap)
-  model.rs            serde types (Db, Category, Item, Recipe, List, Snapshot)
-  store.rs            load/save/backup/migrate/seed; AppState (Arc<Mutex<..>>)
+  model.rs            serde types (Db, Category, Item, Recipe, List, Snapshot) + Db helpers
+  store.rs            load/save/backup/migrate/seed; AppState (Arc<Mutex<..>>), mutate, undo
   names.rs            normalization + validation
-  error.rs            ApiError -> JSON response
+  demo.rs             --demo catalog (names relied on by tests)
+  error.rs            ApiError -> JSON response; ApiJson extractor
   export.rs           list -> text
   api/                one module per resource: categories, items, recipes, list, meta
 tests/                Rust integration tests (tower::ServiceExt::oneshot against app())

@@ -58,8 +58,8 @@ There is no login: anyone on your Wi-Fi can open the app. Don't expose port 3000
 - To restore a backup: stop the server, copy the backup over `data/db.json`, start the server.
 - To back up elsewhere, just copy the `data/` folder.
 - The old version's `data/*.ron` files are not imported; they are left alone.
-
-(Storage arrives with task T2 of the rewrite; until then the server keeps nothing.)
+- If `db.json` is ever unreadable (e.g. a bad hand edit), the server refuses to start and says
+  why; it never overwrites the file. Fix it or restore a backup.
 
 ## Changing the app
 

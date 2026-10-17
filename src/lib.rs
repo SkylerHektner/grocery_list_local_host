@@ -3,6 +3,11 @@
 
 pub mod api;
 pub mod config;
+pub mod demo;
+pub mod error;
+pub mod model;
+pub mod names;
+pub mod store;
 
 use std::path::Path;
 
@@ -14,19 +19,20 @@ use axum::routing::any;
 use tower_http::services::ServeDir;
 
 pub use config::AppConfig;
+pub use error::{ApiError, ApiJson};
+pub use store::AppState;
 
-/// Builds the app: JSON API under `/api`, static files from `static_dir` for every other path
-/// (`/` serves `index.html`). Unknown `/api/*` paths get a JSON 404, never the static fallback.
-///
-/// T2 seam: this will also take the shared store state (`AppState`) and hand it to
-/// [`api::router`], e.g. `pub fn app(state: AppState, static_dir: impl AsRef<Path>) -> Router`.
-pub fn app(static_dir: impl AsRef<Path>) -> Router {
+/// Builds the app around an opened store: JSON API under `/api`, static files from `static_dir`
+/// for every other path (`/` serves `index.html`). Unknown `/api/*` paths get a JSON 404, never
+/// the static fallback.
+pub fn app(state: AppState, static_dir: impl AsRef<Path>) -> Router {
     Router::new()
         .nest("/api", api::router())
         // `nest` covers `/api` and `/api/x…` but not the bare `/api/`.
         .route("/api/", any(api::not_found))
         .fallback_service(ServeDir::new(static_dir.as_ref()))
         .layer(map_response(default_no_cache))
+        .with_state(state)
 }
 
 /// Static files are edited live during development, and API responses must always be fresh,

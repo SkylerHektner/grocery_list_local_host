@@ -45,7 +45,22 @@ Goal: a clean skeleton that every later task can build, test and verify without 
   data lives, backups.
 
 ## T2 — Backend data layer
-- [ ] Done
+- [x] Done
+
+Notes: Handlers take `State<AppState>` and do all writes via
+`state.mutate(|db: &mut Db| -> Result<T, ApiError>) -> Result<(Snapshot, T), ApiError>` (edits a
+clone; on Ok bumps version + atomic save; on Err/failed save nothing changes) and reply
+`Json(MutationResponse::new(snapshot, id))`. List edits use `mutate_with(ListUndo::Record, ..)`
+(pushes the old list only if it changed; cap 50), item delete `ListUndo::Clear` (consider it for
+recipe delete too: old list states would reference the deleted recipe); `state.undo_list()`
+implements undo (409 "nothing to undo"). Reads: `state.read(|db| ..)`. Bodies: `ApiJson<T>`
+(JSON 400 on bad bodies). Helpers: `db.alloc_id()`, `find_item/_mut(id)?` (404),
+`list_entry(_mut)`, `*_by_name_ci`, `check_item_names/check_recipe_name/check_category_name`
+(409), `names::validate_name(raw, "item name")`, `validate_aliases`, `validate_note`,
+`model::unix_now()`. Tests: `TestApp::new()` / `TestApp::demo()` (temp data dir) with
+`get/post/put/delete`, `res.error()`, `item_id("Milk")`, `assert_consistent()` (runs
+`Db::consistency_problems()` + memory == disk), `restart()`. Demo names: doc comment of
+`src/demo.rs` (item ids 12–54, recipes 55–58). Fresh DB `version` is 0.
 
 - `model.rs`, `names.rs`, `error.rs`, `store.rs` per SPEC §2 and §5.
 - Atomic save, backups (keep 10), schema version check, default category seed, `--demo` seed

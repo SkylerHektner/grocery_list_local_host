@@ -1,6 +1,7 @@
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::process::ExitCode;
 
+use rust_html_server::AppState;
 use rust_html_server::config::{self, Command, USAGE};
 
 #[tokio::main]
@@ -20,18 +21,8 @@ async fn main() -> ExitCode {
         }
     };
 
-    if let Err(err) = std::fs::create_dir_all(&config.data_dir) {
-        eprintln!(
-            "error: cannot create data dir {}: {err}",
-            config.data_dir.display()
-        );
-        return ExitCode::FAILURE;
-    }
-
-    // T2 seam: load/seed the store from `config.data_dir` (honouring `config.demo`) and pass the
-    // resulting state into `app`.
-    let app = rust_html_server::app(&config.static_dir);
-
+    // Bind before opening the store, so a second instance on a busy port fails without
+    // touching the data dir (opening an existing DB writes a backup).
     let listener = match tokio::net::TcpListener::bind(config.addr).await {
         Ok(listener) => listener,
         Err(err) => {
@@ -40,6 +31,18 @@ async fn main() -> ExitCode {
         }
     };
     let addr = listener.local_addr().unwrap_or(config.addr);
+
+    let (state, report) = match AppState::open(&config.data_dir, config.demo) {
+        Ok(opened) => opened,
+        Err(err) => {
+            eprintln!("error: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
+    for warning in &report.warnings {
+        eprintln!("warning: {warning}");
+    }
+    let app = rust_html_server::app(state.clone(), &config.static_dir);
 
     println!("Listening on http://{addr}");
     if addr.ip().is_unspecified() {
@@ -52,10 +55,22 @@ async fn main() -> ExitCode {
             None => println!("  Phone: could not detect this computer's LAN IP (try `ipconfig`)"),
         }
     }
-    println!("Data dir:   {}", config.data_dir.display());
+    let db_status = if report.created {
+        "new".to_string()
+    } else {
+        format!("loaded, version {}", state.version())
+    };
+    println!("Database:   {} ({db_status})", report.db_path.display());
+    if let Some(backup) = &report.backup {
+        println!("Backup:     {}", backup.display());
+    }
     println!("Static dir: {}", config.static_dir.display());
     if config.demo {
-        println!("Demo mode:  on");
+        if report.demo_seeded {
+            println!("Demo mode:  seeded the demo catalog");
+        } else {
+            println!("Demo mode:  skipped (demo data is only seeded into a new database)");
+        }
     }
 
     if let Err(err) = axum::serve(listener, app)

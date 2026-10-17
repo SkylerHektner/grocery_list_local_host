@@ -11,18 +11,23 @@ and the Notes of the tasks before it). Keep responses concise.
 ```
 Cargo.toml              lib + bin crate; package and binary are both `rust_html_server`
 src/main.rs             CLI entry: parse config, create data dir, bind, print LAN URL, Ctrl+C shutdown
-src/lib.rs              pub fn app(..) -> Router   <- used by main.rs AND tests (the main seam)
+src/lib.rs              pub fn app(state, static_dir) -> Router  <- used by main.rs AND tests
 src/config.rs           flags/env parsing as a pure fn (unit tests inside)
+src/model.rs            serde types (Db, Item, ..., Snapshot, MutationResponse) + Db lookup/check helpers
+src/names.rs            name/alias/note normalization + validation
+src/store.rs            AppState: open/backup/migrate, mutate(|db| ..) = atomic save, list undo
+src/demo.rs             --demo catalog (item/recipe names documented at the top)
+src/error.rs            ApiError (-> {"error": msg}) and ApiJson<T> body extractor
 src/api/mod.rs          /api router + JSON 404/405 fallbacks; one submodule per resource
-src/api/meta.rs         GET /api/health (state/version arrive in T2)
-tests/app.rs            integration tests: oneshot requests against app()
-tests/common/mod.rs     helpers: send(&app, method, uri, Option<json>) / get(&app, uri) -> TestResponse
+src/api/meta.rs         GET /api/health, /api/state, /api/version
+tests/*.rs              integration tests: oneshot requests against app()
+tests/common/mod.rs     TestApp::new()/demo() (temp data dir) with get/post/put/delete -> TestResponse
 public/                 frontend, served from disk (no build step, no runtime deps)
   index.html  css/app.css  js/main.js  js/fuzzy.js  js/*.test.js
 e2e/                    Playwright Test (own package.json, uses system Microsoft Edge)
   playwright.config.ts  global-teardown.ts  tests/fixtures.ts  tests/*.spec.ts
 scripts/check.ps1|.sh   every check, in order, stops at first failure
-docs/                   SPEC.md, TASKS.md, API.md (API.md from T3)
+docs/                   SPEC.md, TASKS.md, API.md
 .claude/launch.json     "dev" preview server: 127.0.0.1:3999, data in target/dev-data, --demo
 .claude/settings.json   allowlisted check/test commands
 data/                   THE OWNER'S REAL DATA (gitignored). Never touch. See "Data safety".
@@ -57,7 +62,10 @@ itself and stops it afterwards. The temp dir is `%TEMP%/grocery-e2e/run-*` (expo
 **Rust**
 - Thin handlers: extract → call a store/model function → map to response. Logic lives in plain
   functions (`store.rs`, `names.rs`, `export.rs`, ...) with unit tests.
-- Errors go through `ApiError` (`src/error.rs`, from T2) → `{"error": "<message>"}` with 400/404/409.
+- Errors go through `ApiError` (`src/error.rs`) → `{"error": "<message>"}` with 400/404/409/500;
+  take JSON bodies with `ApiJson<T>` so malformed bodies are JSON 400s too.
+- All writes go through `AppState::mutate` (never edit `Db` outside it): it versions, saves
+  atomically, and rolls back on error.
   No `unwrap`/`expect`/`panic!` in request paths.
 - Each resource has `src/api/<resource>.rs` exposing its routes; `api::router()` merges them
   **before** the fallbacks (axum applies `method_not_allowed_fallback` only to earlier routes).
