@@ -1531,8 +1531,29 @@ mark {
   margin-top: var(--space-1);
 }
 
+/* The List view's category headers are the landmarks of the store walk: bigger and in full ink,
+   with a hairline under them (the shared .group-header is a small muted caption). */
 .list-group .group-header {
-  padding-inline: 12px;
+  align-items: center;
+  margin-bottom: var(--space-1);
+  padding: var(--space-5) 12px var(--space-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-size: var(--text-lg);
+  font-weight: 750;
+  letter-spacing: 0.06em;
+}
+
+.list-group:first-child .group-header {
+  padding-top: var(--space-3);
+}
+
+.list-group .group-count {
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
 }
 
 .list-row {
