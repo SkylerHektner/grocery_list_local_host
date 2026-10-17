@@ -1,2 +1,23 @@
+# Rust build output (also holds target/dev-data from the .claude/launch.json dev server)
 /target
+
+# The owner's real grocery data + backups. Never commit, never touch from tests/dev.
 /data
+
+# Playwright (e2e/)
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+e2e/playwright/.cache/
+e2e/.cache/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Claude Code per-user overrides (the shared .claude/settings.json IS committed)
+.claude/settings.local.json

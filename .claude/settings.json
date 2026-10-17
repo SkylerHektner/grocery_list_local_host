@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo check:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(node --test:*)",
+      "Bash(npm test:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(./scripts/check.sh:*)",
+      "Bash(bash scripts/check.sh:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "PowerShell(cargo check:*)",
+      "PowerShell(cargo test:*)",
+      "PowerShell(cargo clippy:*)",
+      "PowerShell(cargo fmt:*)",
+      "PowerShell(node --test:*)",
+      "PowerShell(npm test:*)",
+      "PowerShell(npx playwright test:*)",
+      "PowerShell(./scripts/check.ps1:*)",
+      "PowerShell(.\\scripts\\check.ps1:*)",
+      "PowerShell(pwsh -File scripts/check.ps1:*)",
+      "PowerShell(pwsh -NoProfile -File scripts/check.ps1:*)",
+      "PowerShell(git status:*)",
+      "PowerShell(git diff:*)",
+      "PowerShell(git log:*)"
+    ]
+  }
+}

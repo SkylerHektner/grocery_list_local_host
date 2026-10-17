@@ -1,52 +1,87 @@
-mod grocery_list;
-mod items;
-mod recipe;
-mod utils;
+use std::net::{IpAddr, SocketAddr, UdpSocket};
+use std::process::ExitCode;
 
-use axum::{
-    Router,
-    routing::{get, patch, post},
-};
-use grocery_list::{
-    add_to_grocery_list, add_items_to_grocery_list, delete_from_grocery_list, 
-    delete_items_from_grocery_list, delete_grocery_list, get_grocery_list,
-};
-use items::{add_item, delete_item, get_categories, get_items, update_item};
-use recipe::{add_recipe, get_recipes, delete_recipe, edit_recipe};
-use std::net::SocketAddr;
-use std::path::Path;
-use tokio::fs;
-use tower_http::services::ServeDir;
+use rust_html_server::config::{self, Command, USAGE};
 
 #[tokio::main]
-async fn main() {
-    // Ensure the data directory exists
-    if !Path::new("data").exists() {
-        fs::create_dir("data").await.unwrap();
+async fn main() -> ExitCode {
+    let args = std::env::args_os()
+        .skip(1)
+        .map(|a| a.to_string_lossy().into_owned());
+    let config = match config::parse(args, |key| std::env::var(key).ok()) {
+        Ok(Command::Run(config)) => config,
+        Ok(Command::Help) => {
+            println!("{USAGE}");
+            return ExitCode::SUCCESS;
+        }
+        Err(err) => {
+            eprintln!("error: {err}\n\n{USAGE}");
+            return ExitCode::from(2);
+        }
+    };
+
+    if let Err(err) = std::fs::create_dir_all(&config.data_dir) {
+        eprintln!(
+            "error: cannot create data dir {}: {err}",
+            config.data_dir.display()
+        );
+        return ExitCode::FAILURE;
     }
 
-    // Set up our router. We have an API endpoint and the static fallback.
-    let app = Router::new()
-        .route("/api/items", get(get_items).post(add_item))
-        .route("/api/items/{name}", patch(update_item).delete(delete_item))
-        .route("/api/categories", get(get_categories))
-        .route(
-            "/api/grocery_list",
-            get(get_grocery_list)
-                .post(add_to_grocery_list)
-                .delete(delete_grocery_list),
-        )
-        .route("/api/grocery_list/batch", post(add_items_to_grocery_list))
-        .route("/api/grocery_list/delete", post(delete_from_grocery_list))
-        .route("/api/grocery_list/batch/delete", post(delete_items_from_grocery_list))
-        .route("/api/recipes", post(add_recipe).get(get_recipes))
-        .route("/api/recipes/delete", post(delete_recipe))
-        .route("/api/recipes/edit", patch(edit_recipe))
-        .fallback_service(ServeDir::new("public"));
+    // T2 seam: load/seed the store from `config.data_dir` (honouring `config.demo`) and pass the
+    // resulting state into `app`.
+    let app = rust_html_server::app(&config.static_dir);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    println!("Server running on http://{}", addr);
+    let listener = match tokio::net::TcpListener::bind(config.addr).await {
+        Ok(listener) => listener,
+        Err(err) => {
+            eprintln!("error: cannot bind {}: {err}", config.addr);
+            return ExitCode::FAILURE;
+        }
+    };
+    let addr = listener.local_addr().unwrap_or(config.addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    println!("Listening on http://{addr}");
+    if addr.ip().is_unspecified() {
+        println!("  This computer: http://localhost:{}", addr.port());
+        match lan_ip() {
+            Some(ip) => println!(
+                "  Phone (same Wi-Fi): http://{}",
+                SocketAddr::new(ip, addr.port())
+            ),
+            None => println!("  Phone: could not detect this computer's LAN IP (try `ipconfig`)"),
+        }
+    }
+    println!("Data dir:   {}", config.data_dir.display());
+    println!("Static dir: {}", config.static_dir.display());
+    if config.demo {
+        println!("Demo mode:  on");
+    }
+
+    if let Err(err) = axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+    {
+        eprintln!("error: server failed: {err}");
+        return ExitCode::FAILURE;
+    }
+    println!("Shut down cleanly.");
+    ExitCode::SUCCESS
+}
+
+/// The LAN address other devices can reach. "Connecting" a UDP socket only selects a route and
+/// local address; no packets are sent.
+fn lan_ip() -> Option<IpAddr> {
+    let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
+    socket.connect("8.8.8.8:80").ok()?;
+    let ip = socket.local_addr().ok()?.ip();
+    (!ip.is_unspecified() && !ip.is_loopback()).then_some(ip)
+}
+
+async fn shutdown_signal() {
+    if tokio::signal::ctrl_c().await.is_err() {
+        // No Ctrl+C handler available: run until killed.
+        std::future::pending::<()>().await;
+    }
+    println!("Shutting down...");
 }

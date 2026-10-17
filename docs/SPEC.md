@@ -325,7 +325,7 @@ docs/                 SPEC.md, TASKS.md, API.md
 ## 6. Quality bar
 
 - `scripts/check.ps1` passes: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
-  `cargo test`, `node --test public/js`, Playwright e2e.
+  `cargo test`, `node --test "public/js/**/*.test.js"`, Playwright e2e.
 - Every API endpoint has integration tests (happy path + main error cases).
 - Every P0 keyboard flow has a Playwright test; mobile layout has a test at 375×812.
 - Tests and dev servers **never** touch the real `data/` directory (temp dirs / port 3999).

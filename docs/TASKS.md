@@ -10,7 +10,18 @@ Status legend: `[ ]` todo · `[x]` done
 ---
 
 ## T1 — Agent-friendly workspace & scaffold
-- [ ] Done
+- [x] Done
+
+Notes: Seams for T2 are marked `T2 seam` in `src/lib.rs` (`app(static_dir)` → add `AppState`),
+`src/api/meta.rs` (health returns `version: 0`) and `src/main.rs` (load/seed store, honour
+`config.demo`); `api::json_error` in `src/api/mod.rs` is a stand-in for `ApiError`. Register new
+routes in `api::router()` before its fallbacks. Unknown `/api/*` → JSON 404, wrong method → JSON
+405; all responses get `Cache-Control: no-cache` unless a handler sets one. JS tests:
+`node --test "public/js/**/*.test.js"` (a bare directory arg fails on Node 26; no package.json
+needed — Node detects ESM syntax). E2E: import from `tests/fixtures.ts` (auto-fails on console
+errors); one shared server/DB per run with `workers: 1`; data dir in
+`process.env.GROCERY_E2E_DATA_DIR`. Port 3999 is shared by the e2e webServer and the
+`.claude/launch.json` preview — stop the preview before running Playwright.
 
 Goal: a clean skeleton that every later task can build, test and verify without guesswork.
 
