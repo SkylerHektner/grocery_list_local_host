@@ -63,6 +63,94 @@ To undo it: `Remove-NetFirewallRule -DisplayName "Grocery list (TCP 3000)"`.
 
 There is no login: anyone on your Wi-Fi can open the app. Don't expose port 3000 to the internet.
 
+## Host it on a Raspberry Pi (optional)
+
+Instead of keeping a PC running, the server can live on a Raspberry Pi that starts it on boot and
+answers at **http://grocery.local** (no port, no IP to remember). Tested on a Pi 4 Model B with
+64-bit Raspberry Pi OS Lite (Debian 13 "trixie"); any 64-bit Pi 3/4/5 should work the same.
+Commands below run in PowerShell on your PC unless they start with `ssh`.
+
+### 1. Make an SSH key (once, on your PC)
+
+```powershell
+ssh-keygen -t ed25519 -C "grocery-pi"
+```
+
+### 2. Flash the SD card with Raspberry Pi Imager
+
+Choose **Raspberry Pi OS Lite (64-bit)**
+
+- **Hostname:** `grocery`. This is what makes `grocery.local` work.
+- **User:** username `grocery` and a password (sudo uses it). Write this down, you will forget it.
+- **Wi-Fi:** your network, or skip it and plug in Ethernet (more reliable for a server).
+- **Remote access:** enable SSH → **Use public key authentication** → click **BROWSE** and pick
+  `id_ed25519.pub`. Don't type the file's path into the box. Use browse.
+
+Boot the Pi and give it a minute, then check it's on the network and log in:
+
+```powershell
+ping grocery.local
+ssh grocery@grocery.local
+```
+
+### 3. Install Rust and build on the Pi
+
+```powershell
+ssh -t grocery@grocery.local "sudo apt-get update && sudo apt-get install -y build-essential git curl"
+ssh grocery@grocery.local "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal"
+ssh grocery@grocery.local "git clone https://github.com/SkylerHektner/grocery_list_local_host.git ~/grocery"
+ssh grocery@grocery.local "cd ~/grocery && ~/.cargo/bin/cargo build --release --locked"
+```
+
+The first build takes about 2 minutes on a Pi 4; later builds are much faster.
+
+### 4. Run it as a service (starts on boot, restarts on crash)
+
+Save this as `grocery.service` on your PC:
+
+```ini
+[Unit]
+Description=Grocery list server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=grocery
+Group=grocery
+WorkingDirectory=/home/grocery/grocery
+ExecStart=/home/grocery/grocery/target/release/rust_html_server --addr 0.0.0.0:80 --data-dir /home/grocery/grocery-data --static-dir /home/grocery/grocery/public
+# Lets the non-root user bind port 80.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Copy it to the Pi, install it, and start it:
+
+```powershell
+scp grocery.service grocery@grocery.local:/home/grocery/grocery.service
+ssh -t grocery@grocery.local "sudo install -m 644 ~/grocery.service /etc/systemd/system/grocery.service && sudo systemctl daemon-reload && sudo systemctl enable --now grocery && rm ~/grocery.service"
+```
+
+Open **http://grocery.local** on your laptop or phone. After a power cut the Pi boots and the app
+is back in about 30 seconds. No firewall step is needed: Raspberry Pi OS doesn't block incoming
+connections by default.
+
+### Day to day
+
+| What | Command |
+|---|---|
+| Update to the latest code | `ssh -t grocery@grocery.local "cd ~/grocery && git pull && ~/.cargo/bin/cargo build --release --locked && sudo systemctl restart grocery"` |
+| Is it running? | `ssh grocery@grocery.local "systemctl status grocery --no-pager"` |
+| Recent logs | `ssh grocery@grocery.local "journalctl -u grocery -n 50 --no-pager"` |
+| Copy the data back to your PC | `scp -r grocery@grocery.local:/home/grocery/grocery-data .\pi-backup` |
+
+Frontend-only changes (`public/`) need just the `git pull`; reload the page. Data and backups work
+as described in [Your data](#your-data), with `~/grocery-data` in place of `data/`.
+
 ## Using it
 
 The core loop on a laptop is **type → Enter**: `milk⏎ eggs⏎ bananas⏎`. Press `?` anywhere for
