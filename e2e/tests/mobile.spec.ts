@@ -180,10 +180,10 @@ test('tap targets are at least 44 px in every view and dialog', async ({ page, r
   await expect(page.getByTestId('note-input')).toBeVisible();
   expect(await smallTargets(page), 'note editor').toEqual([]);
   await page.getByTestId('list-search').fill('newthing');
-  await page.getByTestId('omnibar-create-item').tap(); // category picker
-  await expect(page.getByTestId('omnibar-picker-back')).toBeVisible();
-  expect(await smallTargets(page), 'omnibar picker').toEqual([]);
-  await page.getByTestId('omnibar-picker-back').tap();
+  await page.getByTestId('omnibar-create-item').tap(); // category sheet
+  await expect(page.getByTestId('category-picker')).toBeVisible();
+  expect(await smallTargets(page), 'new-item category sheet').toEqual([]);
+  await page.getByTestId('category-picker-cancel').tap();
 
   await open(page, '#/recipes');
   expect(await smallTargets(page), 'recipes').toEqual([]);

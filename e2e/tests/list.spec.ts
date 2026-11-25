@@ -156,7 +156,9 @@ test('fuzzy: a typo picks the right item; the highlight resets as the query chan
 test('create a new item by keyboard: create row, Shift+Enter, digits, Tab and filtering', async ({
   page,
   request,
+  isMobile,
 }) => {
+  test.skip(isMobile, 'touch screens get the category sheet (mobile test below)');
   await resetList(request);
   await open(page);
   const input = await omnibar(page);
@@ -210,17 +212,33 @@ test('create a new item by tap (mobile)', async ({ page, request, isMobile }) =>
   await open(page);
   const name = uniqueName();
 
-  await page.getByTestId('list-search').tap();
-  await page.keyboard.type(name);
+  const search = page.getByTestId('list-search');
+  await search.tap();
+  await page.keyboard.type(`${name}, blue`);
   await page.getByTestId('omnibar-create-item').tap();
-  await expect(page.getByTestId('omnibar-picker-title')).toBeVisible();
-  const option = page.getByTestId('category-option').nth(2);
+
+  // A bottom sheet with focus (so the on-screen keyboard goes away), not the inline dropdown.
+  const sheet = page.getByTestId('category-picker');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole('heading')).toHaveText(`New item "${name}"`);
+  await expect(page.getByTestId('omnibar-picker-title')).toHaveCount(0);
+  await expect(search).not.toBeFocused();
+  await expect(sheet.getByTestId('category-picker-input')).not.toBeFocused();
+
+  // Cancel keeps the text; the create row brings the sheet back.
+  await sheet.getByTestId('category-picker-cancel').tap();
+  await expect(sheet).toHaveCount(0);
+  await expect(search).toHaveValue(`${name}, blue`);
+  await page.getByTestId('omnibar-create-item').tap();
+
+  const option = sheet.getByTestId('category-option').nth(2);
   expect((await option.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   const category = (await option.locator('.option-label').textContent())!.trim();
   await option.tap();
 
   await expect(group(page, category).getByTestId('row-name')).toHaveText([name]);
-  await expect(page.getByTestId('list-search')).toHaveValue('');
+  await expect(row(page, name).getByTestId('row-note')).toHaveText('blue');
+  await expect(search).toHaveValue('');
   // Tap targets on the row and no horizontal scroll with content on the list.
   for (const id of ['remove-entry', 'edit-note']) {
     const box = (await row(page, name).getByTestId(id).boundingBox())!;

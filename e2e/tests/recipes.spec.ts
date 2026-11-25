@@ -108,7 +108,9 @@ test('create a recipe entirely by keyboard from the List omnibar, then go back',
   await page.keyboard.type(fresh);
   await expect(page.getByTestId('omnibar-create-recipe')).toHaveCount(0); // items only here
   await page.keyboard.press('Enter');
-  await expect(page.getByTestId('omnibar-picker-name')).toHaveText(fresh);
+  // Touch screens get the category sheet (same numbers), keyboards the inline picker.
+  if (isMobile) await expect(page.getByTestId('category-picker').getByRole('heading')).toHaveText(`New item "${fresh}"`);
+  else await expect(page.getByTestId('omnibar-picker-name')).toHaveText(fresh);
   const category = (await page.locator('[data-testid="category-option"][data-number="2"] .option-label').textContent())!.trim();
   await page.keyboard.press('2');
 

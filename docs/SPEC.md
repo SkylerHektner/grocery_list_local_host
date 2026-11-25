@@ -164,7 +164,10 @@ Triggered from the create row. The dropdown turns into a category picker:
 - Selection creates the item **and** adds it to the list (or to the recipe being edited) in one
   step, with the inline note if one was typed, then returns focus to the empty omnibar. If the
   create fails (e.g. the name is another item's alias) the typed text comes back.
-- On mobile the same picker is a tappable list of category rows (≥ 44 px) with a Back button.
+- On touch screens the picker is a bottom sheet instead of the dropdown (same order, numbers,
+  filter and rows ≥ 44 px): it takes focus so the on-screen keyboard goes away and the categories
+  aren't squeezed above it, and its filter isn't focused until tapped. Cancel returns to the search
+  with the text intact; a pick creates and adds the item as above.
 
 ### 3.3 Fuzzy search (P0) — must be excellent
 

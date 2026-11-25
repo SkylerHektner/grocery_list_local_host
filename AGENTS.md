@@ -55,7 +55,8 @@ public/                 frontend, served from disk (no build step, no runtime de
   js/components/        toast.js, dialog.js (openModal, confirm), shortcut-help.js, empty.js,
                         omnibar.js (+ omnibar-rows.js DOM), cull-dialog.js (addRecipeWithCull),
                         name-dialog.js (promptName), copy-dialog.js, sticky-bar.js,
-                        pick-dialog.js (openPicker: filterable "pick one" modal, digit keys)
+                        pick-dialog.js (openPicker: filterable "pick one" modal, digit keys),
+                        category-picker.js (pickCategory sheet: Items view + omnibar on touch)
   js/views/list*.js     List view: list.js + list-rows/list-row-view (rows), list-chips,
                         list-export (export text cache for Copy)
   js/views/recipe*.js   Recipes view: recipes.js (routes #/recipes and #/recipes/<id>, shared

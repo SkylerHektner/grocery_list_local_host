@@ -19,6 +19,7 @@
 // Enter picks it, Shift+Enter creates an item, Esc clears (then calls onEscape / leaves the box).
 // Picker: 1-9 pick (only while the filter is empty), 0 or Tab = Uncategorized, typing filters,
 // Enter picks the highlight, Esc or Backspace on an empty filter goes back with the text intact.
+// Touch screens get the category-picker bottom sheet instead (no keyboard covering the rows).
 //
 // Never races fast typing: options are recomputed synchronously on every input event (and again
 // on Enter if the value changed since), the input clears and keeps focus right after a pick, and
@@ -26,8 +27,9 @@
 // order. A pick that fails puts its text back if the input is still empty. Live-sync updates only
 // re-render the dropdown (the input is never replaced) and keep the highlighted option.
 
-import { parkFocus } from '../dom.js';
+import { isKeyboardDevice, parkFocus } from '../dom.js';
 import { createQueue } from '../queue.js';
+import { pickCategory } from './category-picker.js';
 import { roomBelow } from '../viewport.js';
 import { categoryForDigit, categoryOptions, keyAction, moveIndex, searchModel } from '../omnibar-model.js';
 import {
@@ -266,6 +268,10 @@ export function createOmnibar(config) {
       toast(`"${exactItem.name}" already exists. Press Enter to add it.`);
       return;
     }
+    if (!isKeyboardDevice()) {
+      createWithSheet({ raw, name: query, note });
+      return;
+    }
     picker = { raw, name: query, note };
     mode = 'picker';
     input.value = '';
@@ -298,6 +304,22 @@ export function createOmnibar(config) {
     exitPicker(false);
     run(async () => {
       const { id } = await api.createItem({ name, category_id: category ? category.id : null });
+      const item = store.state.itemsById.get(id);
+      if (item) await onPickItem(item, { note, created: true });
+    }, raw);
+  }
+
+  /**
+   * Touch screens: the category picker is a bottom sheet instead of the dropdown. The sheet takes
+   * focus (so the on-screen keyboard goes away and every category fits) and hands it back to the
+   * input when it closes. Cancel leaves the typed text as it was.
+   */
+  async function createWithSheet({ raw, name, note }) {
+    const choice = await pickCategory({ store, title: `New item "${name}"`, lead: 'Choose its category.' });
+    if (destroyed || !choice) return;
+    if (input.value === raw) clear();
+    run(async () => {
+      const { id } = await api.createItem({ name, category_id: choice.categoryId });
       const item = store.state.itemsById.get(id);
       if (item) await onPickItem(item, { note, created: true });
     }, raw);
